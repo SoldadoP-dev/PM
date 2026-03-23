@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -37,10 +39,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -48,11 +53,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.pm.ui.theme.PMTheme
-import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.maps.android.compose.*
@@ -66,35 +71,27 @@ val DeepSpace = Color(0xFF0A0A0A)
 val CardGray = Color(0xFF1A1A1A)
 val InstaGradient = Brush.linearGradient(listOf(Color(0xFF833AB4), Color(0xFFFD1D1D), Color(0xFFFCAF45)))
 
-/**
- * Actividad principal de la aplicación. Configura el tema y la navegación raíz.
- */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge() // Habilita diseño de borde a borde (detrás de la barra de estado)
+        enableEdgeToEdge()
         setContent {
-            PMTheme(darkTheme = true) { // Forzado a modo oscuro para estética nocturna
+            PMTheme(darkTheme = true) {
                 AppNavigation()
             }
         }
     }
 }
 
-/**
- * Gestiona el flujo de navegación principal entre Login, Registro y la App Principal.
- */
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
-    // Decide la pantalla de inicio según si hay una sesión activa
     val startDestination = if (auth.currentUser == null) "login" else "main"
 
     NavHost(
         navController = navController, 
         startDestination = startDestination,
-        // Animaciones de transición tipo "Instagram" (deslizamiento lateral)
         enterTransition = { fadeIn(tween(400)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(400)) },
         exitTransition = { fadeOut(tween(400)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(400)) },
         popEnterTransition = { fadeIn(tween(400)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(400)) },
@@ -105,21 +102,18 @@ fun AppNavigation() {
         composable("main") { MainScreen(navController) }
         composable("notifications") { NotificationsScreen(navController) }
         
-        // Pantalla de lista de seguidores/siguiendo
         composable("userList/{type}/{userId}") { backStackEntry ->
             val type = backStackEntry.arguments?.getString("type") ?: ""
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
             UserListScreen(navController, type, userId)
         }
         
-        // Pantalla de detalle de chat (Blindada contra caracteres especiales)
         composable("chat/{chatId}/{otherName}") { backStackEntry ->
             val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
             val otherName = Uri.decode(backStackEntry.arguments?.getString("otherName") ?: "Usuario")
             ChatDetailScreen(navController, chatId, otherName)
         }
         
-        // Perfil de otros usuarios
         composable("otherProfile/{userId}") { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
             OtherProfileScreen(navController, userId)
@@ -127,9 +121,6 @@ fun AppNavigation() {
     }
 }
 
-/**
- * Pantalla de inicio de sesión con Firebase Auth.
- */
 @Composable
 fun LoginScreen(navController: NavHostController) {
     var email by remember { mutableStateOf("") }
@@ -186,9 +177,6 @@ fun LoginScreen(navController: NavHostController) {
     }
 }
 
-/**
- * Pantalla de registro de nuevos usuarios en Firebase y Firestore.
- */
 @Composable
 fun RegisterScreen(navController: NavHostController) {
     var username by remember { mutableStateOf("") }
@@ -253,9 +241,6 @@ fun RegisterScreen(navController: NavHostController) {
     }
 }
 
-/**
- * Contenedor principal que incluye el Scaffold, la TopBar y la BottomNavigationBar.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(rootNavController: NavHostController) {
@@ -299,16 +284,13 @@ fun MainScreen(rootNavController: NavHostController) {
                     contentColor = Color.White,
                     shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
                 ) {
-                    VenueDetailSheet(selectedVenue!!) { showBottomSheet = false }
+                    VenueDetailSheet(selectedVenue!!, rootNavController)
                 }
             }
         }
     }
 }
 
-/**
- * Barra de navegación inferior con iconos dinámicos.
- */
 @Composable
 fun BottomNavigationBar(navController: NavHostController) {
     val items = listOf(
@@ -342,9 +324,6 @@ fun BottomNavigationBar(navController: NavHostController) {
     }
 }
 
-/**
- * Grafo de navegación interna para las secciones de la barra inferior.
- */
 @Composable
 fun NavigationGraph(
     navController: NavHostController, 
@@ -361,9 +340,6 @@ fun NavigationGraph(
     }
 }
 
-/**
- * Pantalla principal que combina el carrusel de historias y el mapa.
- */
 @Composable
 fun HomeScreen(onVenueClick: (Venue) -> Unit) {
     Column(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
@@ -372,9 +348,6 @@ fun HomeScreen(onVenueClick: (Venue) -> Unit) {
     }
 }
 
-/**
- * Carrusel horizontal de historias superiores con borde degradado.
- */
 @Composable
 fun StoriesRow() {
     val stories = listOf("Tú", "Dani", "Elena", "Marc", "Sara", "Pau", "Lucas")
@@ -402,46 +375,40 @@ fun StoriesRow() {
     }
 }
 
-/**
- * Integración de Google Maps con buscador de locales real integrado.
- */
 @SuppressLint("MissingPermission")
 @Composable
 fun MapSection(onVenueClick: (Venue) -> Unit) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
-    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    val firestore = FirebaseFirestore.getInstance()
+    
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(40.4168, -3.7038), 14f)
     }
     
+    var venues by remember { mutableStateOf<List<Venue>>(emptyList()) }
+    var searchQuery by remember { mutableStateOf("") }
     var hasPermission by remember { 
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) 
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasPermission = it }
 
-    LaunchedEffect(hasPermission) {
-        if (hasPermission) {
-            fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
-                loc?.let { 
-                    cameraPositionState.position = CameraPosition.fromLatLngZoom(LatLng(it.latitude, it.longitude), 15f) 
-                }
-            }
-        } else launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-    }
-
-    val firestore = FirebaseFirestore.getInstance()
-    var venues by remember { mutableStateOf<List<Venue>>(emptyList()) }
-    var searchQuery by remember { mutableStateOf("") }
-
+    // --- CARGA DE DATOS ---
     LaunchedEffect(Unit) {
-        firestore.collection("venues").get().addOnSuccessListener { snapshot ->
-            venues = snapshot.toObjects(Venue::class.java)
+        firestore.collection(" venues").addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                Toast.makeText(context, "ERROR FIRESTORE: ${error.message}", Toast.LENGTH_LONG).show()
+                return@addSnapshotListener
+            }
+            venues = snapshot?.documents?.mapNotNull { it.toObject(Venue::class.java) } ?: emptyList()
         }
+        
+        if (!hasPermission) launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
     }
 
-    // Filtrado de locales por nombre en tiempo real
-    val filteredVenues = if (searchQuery.isBlank()) venues else venues.filter { it.name.contains(searchQuery, true) }
+    val filteredVenues = if (searchQuery.isBlank()) venues 
+                         else venues.filter { it.name.contains(searchQuery, ignoreCase = true) || it.category.contains(searchQuery, ignoreCase = true) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         GoogleMap(
@@ -450,49 +417,114 @@ fun MapSection(onVenueClick: (Venue) -> Unit) {
             properties = MapProperties(isMyLocationEnabled = hasPermission),
             uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = true)
         ) {
-            filteredVenues.forEach { venue ->
+            venues.forEach { venue ->
                 Marker(
                     state = MarkerState(position = LatLng(venue.location.latitude, venue.location.longitude)),
                     title = venue.name,
+                    snippet = venue.category,
                     onClick = { onVenueClick(venue); true }
                 )
             }
         }
 
-        // Barra de búsqueda flotante sobre el mapa
-        Card(
-            modifier = Modifier.align(Alignment.TopCenter).padding(16.dp).fillMaxWidth().height(54.dp),
-            shape = RoundedCornerShape(27.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.7f)),
-            elevation = CardDefaults.cardElevation(8.dp)
+        // --- BUSCADOR ---
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(16.dp)
+                .fillMaxWidth()
+                .zIndex(5f)
         ) {
-            Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Search, null, tint = NeonPurple)
-                Spacer(modifier = Modifier.width(12.dp))
-                TextField(
-                    value = searchQuery,
-                    onValueChange = { query ->
-                        searchQuery = query
-                        // Vuelo de cámara al primer resultado encontrado
-                        filteredVenues.firstOrNull()?.let { found ->
-                            scope.launch {
-                                cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(LatLng(found.location.latitude, found.location.longitude), 16f), 1000)
+            Card(
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.9f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NeonPurple.copy(alpha = 0.5f))
+            ) {
+                Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Search, null, tint = NeonPurple)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Buscar discoteca...", color = Color.Gray) },
+                        modifier = Modifier.weight(1f),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                if (filteredVenues.isNotEmpty()) {
+                                    val venue = filteredVenues.first()
+                                    onVenueClick(venue)
+                                    scope.launch {
+                                        cameraPositionState.animate(
+                                            CameraUpdateFactory.newLatLngZoom(LatLng(venue.location.latitude, venue.location.longitude), 16f), 1000
+                                        )
+                                    }
+                                    focusManager.clearFocus()
+                                }
+                            }
+                        )
+                    )
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, null, tint = Color.Gray)
+                        }
+                    }
+                }
+            }
+
+            AnimatedVisibility(
+                visible = searchQuery.isNotBlank(),
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Card(
+                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth().heightIn(max = 280.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardGray.copy(alpha = 0.98f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                ) {
+                    if (filteredVenues.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text("No se encontró nada", color = Color.Gray)
+                        }
+                    } else {
+                        LazyColumn {
+                            items(filteredVenues) { venue ->
+                                ListItem(
+                                    modifier = Modifier.clickable {
+                                        onVenueClick(venue)
+                                        scope.launch {
+                                            cameraPositionState.animate(
+                                                CameraUpdateFactory.newLatLngZoom(LatLng(venue.location.latitude, venue.location.longitude), 16f), 1000
+                                            )
+                                        }
+                                        searchQuery = ""
+                                        focusManager.clearFocus()
+                                    },
+                                    headlineContent = { Text(venue.name, color = Color.White, fontWeight = FontWeight.Bold) },
+                                    supportingContent = { Text(venue.category, color = NeonPurple, fontSize = 12.sp) },
+                                    leadingContent = { Icon(Icons.Default.LocalBar, null, tint = Color.Gray) },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                )
                             }
                         }
-                    },
-                    placeholder = { Text("Buscar discotecas...", color = Color.Gray) },
-                    modifier = Modifier.weight(1f),
-                    colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, focusedTextColor = Color.White, unfocusedTextColor = Color.White),
-                    singleLine = true
-                )
+                    }
+                }
             }
         }
     }
 }
 
-/**
- * Pantalla de búsqueda de usuarios con lógica de seguimiento real.
- */
 @Composable
 fun SearchScreen(rootNavController: NavHostController) {
     var searchQuery by remember { mutableStateOf("") }
@@ -538,9 +570,6 @@ fun SearchScreen(rootNavController: NavHostController) {
     }
 }
 
-/**
- * Elemento individual de la lista de búsqueda de usuarios.
- */
 @Composable
 fun UserSearchItem(user: User, currentUser: User?, rootNavController: NavHostController) {
     val firestore = FirebaseFirestore.getInstance()
@@ -601,9 +630,6 @@ fun UserSearchItem(user: User, currentUser: User?, rootNavController: NavHostCon
     }
 }
 
-/**
- * Pantalla que muestra las notificaciones de actividad del usuario.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationsScreen(navController: NavHostController) {
@@ -649,9 +675,6 @@ fun NotificationsScreen(navController: NavHostController) {
     }
 }
 
-/**
- * Elemento individual de notificación.
- */
 @Composable
 fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit) {
     ListItem(
@@ -667,9 +690,6 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit) {
     )
 }
 
-/**
- * Pantalla con la lista de chats activos del usuario.
- */
 @Composable
 fun MessagesListScreen(rootNavController: NavHostController) {
     val firestore = FirebaseFirestore.getInstance()
@@ -702,7 +722,6 @@ fun MessagesListScreen(rootNavController: NavHostController) {
 
                 ListItem(
                     modifier = Modifier.clickable { 
-                        // SEGURIDAD: Codificamos el nombre para evitar crash en navegación
                         val encodedName = Uri.encode(otherName)
                         rootNavController.navigate("chat/${chat.id}/$encodedName") 
                     },
@@ -718,9 +737,6 @@ fun MessagesListScreen(rootNavController: NavHostController) {
     }
 }
 
-/**
- * Pantalla de conversación individual con auto-scroll y burbujas de chat.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatDetailScreen(navController: NavHostController, chatId: String, otherName: String) {
@@ -805,11 +821,8 @@ fun ChatDetailScreen(navController: NavHostController, chatId: String, otherName
     }
 }
 
-/**
- * Pantalla de perfil personal del usuario.
- */
 @Composable
-fun ProfileScreen(isGhostMode: Boolean, onGhostChange: (Boolean) -> Unit, rootNavController: NavHostController) {
+fun ProfileScreen(isGhostMode: Boolean, onGhostModeChange: (Boolean) -> Unit, rootNavController: NavHostController) {
     val auth = FirebaseAuth.getInstance()
     val firestore = FirebaseFirestore.getInstance()
     var user by remember { mutableStateOf<User?>(null) }
@@ -842,7 +855,6 @@ fun ProfileScreen(isGhostMode: Boolean, onGhostChange: (Boolean) -> Unit, rootNa
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Switch para activar el Modo Fantasma (Privacidad)
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = CardGray), shape = RoundedCornerShape(20.dp)) {
             Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (isGhostMode) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = if (isGhostMode) NeonPink else NeonPurple)
@@ -851,13 +863,12 @@ fun ProfileScreen(isGhostMode: Boolean, onGhostChange: (Boolean) -> Unit, rootNa
                     Text("Modo Fantasma", fontWeight = FontWeight.Bold, color = Color.White)
                     Text("Posición oculta en el mapa", fontSize = 12.sp, color = Color.Gray)
                 }
-                Switch(checked = isGhostMode, onCheckedChange = onGhostChange, colors = SwitchDefaults.colors(checkedThumbColor = NeonPurple))
+                Switch(checked = isGhostMode, onCheckedChange = onGhostModeChange, colors = SwitchDefaults.colors(checkedThumbColor = NeonPurple))
             }
         }
         
         Spacer(modifier = Modifier.weight(1f))
 
-        // Botón de Cerrar Sesión con estética Outlined
         OutlinedButton(
             onClick = { 
                 auth.signOut()
@@ -885,9 +896,6 @@ fun ProfileStat(value: String, label: String, onClick: () -> Unit) {
     }
 }
 
-/**
- * Pantalla genérica para mostrar listas de Seguidores o Siguiendo.
- */
 @Composable
 fun UserListScreen(navController: NavHostController, type: String, userId: String) {
     val firestore = FirebaseFirestore.getInstance()
@@ -898,7 +906,7 @@ fun UserListScreen(navController: NavHostController, type: String, userId: Strin
         firestore.collection("users").document(userId).get().addOnSuccessListener { snapshot ->
             val uids = if (type == "followers") snapshot.get("followerUids") as? List<String> else snapshot.get("followingUids") as? List<String>
             if (!uids.isNullOrEmpty()) {
-                firestore.collection("users").whereIn("uid", uids).get().addOnSuccessListener { 
+                firestore.collection("users").whereIn(FieldPath.documentId(), uids).get().addOnSuccessListener { 
                     users = it.toObjects(User::class.java)
                 }
             }
@@ -935,22 +943,26 @@ fun UserListScreen(navController: NavHostController, type: String, userId: Strin
     }
 }
 
-/**
- * Pantalla para visualizar el perfil de otros usuarios.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OtherProfileScreen(navController: NavHostController, userId: String) {
     val firestore = FirebaseFirestore.getInstance()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
     var user by remember { mutableStateOf<User?>(null) }
+    var currentUser by remember { mutableStateOf<User?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(userId) {
         firestore.collection("users").document(userId).addSnapshotListener { snapshot, _ ->
             user = snapshot?.toObject(User::class.java)
         }
+        firestore.collection("users").document(currentUserId).addSnapshotListener { snapshot, _ ->
+            currentUser = snapshot?.toObject(User::class.java)
+        }
     }
+
+    val isFollowing = currentUser?.followingUids?.contains(userId) == true
+    val isPending = user?.pendingFollowRequests?.contains(currentUserId) == true
 
     Scaffold(
         topBar = {
@@ -962,7 +974,9 @@ fun OtherProfileScreen(navController: NavHostController, userId: String) {
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(modifier = Modifier.size(100.dp).border(2.dp, InstaGradient, CircleShape).padding(4.dp).background(Color.DarkGray, CircleShape))
+            Box(modifier = Modifier.size(100.dp).border(2.dp, InstaGradient, CircleShape).padding(4.dp).background(Color.DarkGray, CircleShape), contentAlignment = Alignment.Center) {
+                Text(user?.username?.take(1)?.uppercase() ?: "", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 32.sp)
+            }
             Text(user?.username ?: "", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
             
             Row(modifier = Modifier.padding(vertical = 24.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -971,12 +985,37 @@ fun OtherProfileScreen(navController: NavHostController, userId: String) {
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = {
-                    scope.launch {
-                        firestore.collection("users").document(currentUserId).update("followingUids", FieldValue.arrayRemove(userId), "followingCount", FieldValue.increment(-1))
-                        firestore.collection("users").document(userId).update("followerUids", FieldValue.arrayRemove(currentUserId), "followersCount", FieldValue.increment(-1))
-                    }
-                }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = CardGray)) { Text("Siguiendo", color = Color.White) }
+                Button(
+                    onClick = {
+                        scope.launch {
+                            if (isFollowing) {
+                                // Dejar de seguir (solo si ya seguía)
+                                firestore.collection("users").document(currentUserId).update("followingUids", FieldValue.arrayRemove(userId), "followingCount", FieldValue.increment(-1))
+                                firestore.collection("users").document(userId).update("followerUids", FieldValue.arrayRemove(currentUserId), "followersCount", FieldValue.increment(-1))
+                            } else if (!isPending) {
+                                // Solicitar seguir
+                                firestore.collection("users").document(userId).update("pendingFollowRequests", FieldValue.arrayUnion(currentUserId))
+                                val notif = ActivityNotification(fromUserId = currentUserId, fromUsername = currentUser?.username ?: "", toUserId = userId, type = "follow_request")
+                                firestore.collection("notifications").add(notif)
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isFollowing || isPending) Color.DarkGray else NeonPurple
+                    )
+                ) {
+                    Text(
+                        text = when {
+                            isFollowing -> "Siguiendo"
+                            isPending -> "Pendiente"
+                            else -> "Seguir"
+                        },
+                        color = if (isFollowing || isPending) Color.White else Color.Black,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 
                 Button(onClick = {
                     val chatId = if (currentUserId < userId) "${currentUserId}_${userId}" else "${userId}_${currentUserId}"
@@ -989,23 +1028,96 @@ fun OtherProfileScreen(navController: NavHostController, userId: String) {
     }
 }
 
-/**
- * Panel inferior que muestra los detalles de una discoteca al pulsar su marcador.
- */
 @Composable
-fun VenueDetailSheet(venue: Venue, onAttend: () -> Unit) {
-    Column(modifier = Modifier.padding(32.dp).fillMaxWidth()) {
-        Text(venue.name, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = NeonPurple)
-        Text(venue.category, color = Color.Gray, fontSize = 18.sp)
-        Spacer(modifier = Modifier.height(32.dp))
-        Button(
-            onClick = onAttend, 
-            modifier = Modifier.fillMaxWidth().height(60.dp), 
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
-        ) { 
-            Text("¡CONFIRMAR ASISTENCIA!", color = Color.Black, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp) 
+fun VenueDetailSheet(venue: Venue, navController: NavHostController) {
+    val firestore = FirebaseFirestore.getInstance()
+    val auth = FirebaseAuth.getInstance()
+    val currentUserId = auth.currentUser?.uid ?: return
+    var attendees by remember { mutableStateOf<List<User>>(emptyList()) }
+    var isAttending by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(venue.id) {
+        firestore.collection("attendances")
+            .whereEqualTo("venueId", venue.id)
+            .addSnapshotListener { snapshot, _ ->
+                val attendeeIds = snapshot?.documents?.map { it.getString("userId") ?: "" } ?: emptyList()
+                isAttending = attendeeIds.contains(currentUserId)
+                
+                if (attendeeIds.isNotEmpty()) {
+                    firestore.collection("users")
+                        .whereIn(FieldPath.documentId(), attendeeIds.take(10)) 
+                        .get()
+                        .addOnSuccessListener { userSnapshot ->
+                            attendees = userSnapshot.toObjects(User::class.java)
+                        }
+                } else {
+                    attendees = emptyList()
+                }
+            }
+    }
+
+    Column(modifier = Modifier.padding(24.dp).fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(venue.name, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = NeonPurple)
+                Text("${venue.category} • ${venue.address}", color = Color.Gray, fontSize = 14.sp)
+            }
+            Surface(color = NeonPurple.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
+                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, null, tint = NeonPurple, modifier = Modifier.size(16.dp))
+                    Text(venue.rating.toString(), color = NeonPurple, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
+                }
+            }
         }
-        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text("¿Quién va hoy?", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(top = 24.dp))
+        LazyRow(
+            modifier = Modifier.padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items(attendees) { attendee ->
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable { navController.navigate("otherProfile/${attendee.uid}") }
+                ) {
+                    Box(
+                        modifier = Modifier.size(50.dp).background(Color.DarkGray, CircleShape).border(1.dp, if (attendee.uid == currentUserId) NeonPurple else Color.Transparent, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(attendee.username.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    Text(if (attendee.uid == currentUserId) "Tú" else attendee.username, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+            if (attendees.isEmpty()) {
+                item { Text("Nadie apuntado aún 🔥", color = Color.DarkGray, fontSize = 14.sp) }
+            }
+        }
+
+        Button(
+            onClick = {
+                scope.launch {
+                    if (isAttending) {
+                        val snapshot = firestore.collection("attendances")
+                            .whereEqualTo("userId", currentUserId)
+                            .whereEqualTo("venueId", venue.id)
+                            .get().await()
+                        snapshot.documents.forEach { it.reference.delete().await() }
+                    } else {
+                        firestore.collection("attendances").add(Attendance(userId = currentUserId, venueId = venue.id)).await()
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = if (isAttending) Color.DarkGray else NeonPurple)
+        ) {
+            Icon(if (isAttending) Icons.Default.CheckCircle else Icons.Default.Add, null, tint = if (isAttending) NeonPurple else Color.Black)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(if (isAttending) "ESTOY APUNTADO" else "¡ME APUNTO!", color = if (isAttending) Color.White else Color.Black, fontWeight = FontWeight.ExtraBold)
+        }
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
