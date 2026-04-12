@@ -51,6 +51,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+
     
     // Google Maps
     implementation(libs.maps.compose)
@@ -64,6 +65,8 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+    implementation("com.google.firebase:firebase-database-ktx")
+
 
     // Coil for image loading
     implementation(libs.coil.compose)

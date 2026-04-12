@@ -495,7 +495,8 @@ fun MainScreen(rootNavController: NavHostController, repository: FirebaseReposit
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                beyondViewportPageCount = 3
+                beyondViewportPageCount = 3,
+                userScrollEnabled = pagerState.currentPage != 0 // Desactivamos scroll manual en el mapa para que no interfiera
             ) { page ->
                 when (page) {
                     0 -> HomeScreen(
@@ -557,6 +558,55 @@ fun HomeScreen(onVenueClick: (Venue) -> Unit, repository: FirebaseRepository, ro
     Column(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
         StoriesRow(repository, rootNavController)
         MapSection(onVenueClick)
+        FeedSection(repository, rootNavController)
+    }
+}
+
+@Composable
+fun FeedSection(repository: FirebaseRepository, rootNavController: NavHostController) {
+    val posts by repository.getGlobalPosts().collectAsState(initial = emptyList())
+    
+    if (posts.isNotEmpty()) {
+        Text(
+            "Novedades", 
+            color = Color.White, 
+            fontWeight = FontWeight.Bold, 
+            modifier = Modifier.padding(16.dp),
+            fontSize = 20.sp
+        )
+        LazyColumn(modifier = Modifier.fillMaxWidth().height(400.dp)) {
+            items(posts) { post ->
+                PostItem(post, rootNavController, repository)
+            }
+        }
+    }
+}
+
+@Composable
+fun PostItem(post: Post, navController: NavHostController, repository: FirebaseRepository) {
+    val scope = rememberCoroutineScope()
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(8.dp),
+        colors = CardDefaults.cardColors(containerColor = CardGray)
+    ) {
+        Column {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                UserAvatar(null, post.username, 32.dp) {
+                    navController.navigate("otherProfile/${post.userId}")
+                }
+                Text(post.username, modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold, color = Color.White)
+            }
+            AsyncImage(
+                model = post.imageUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable {
+                    navController.navigate("postDetail/${post.id}")
+                },
+                contentScale = ContentScale.Crop
+            )
+        }
     }
 }
 

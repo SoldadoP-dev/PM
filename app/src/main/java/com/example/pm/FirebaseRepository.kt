@@ -293,4 +293,15 @@ class FirebaseRepository {
             }
         awaitClose { listener.remove() }
     }
+
+    fun getGlobalPosts(): Flow<List<Post>> = callbackFlow {
+        val listener = firestore.collection("posts")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                val posts = snapshot?.toObjects(Post::class.java) ?: emptyList()
+                trySend(posts)
+            }
+        awaitClose { listener.remove() }
+    }
 }
