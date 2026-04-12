@@ -63,6 +63,9 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation("com.google.firebase:firebase-storage-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
+    // Coil for image loading
+    implementation(libs.coil.compose)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

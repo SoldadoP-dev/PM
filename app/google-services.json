@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "172905142467",
-    "project_id": "rsapp-15c9e",
-    "storage_bucket": "rsapp-15c9e.firebasestorage.app"
+    "project_number": "976493563758",
+    "project_id": "pmapp-663d0",
+    "storage_bucket": "pmapp-663d0.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:172905142467:android:56881fab18036bda022a76",
+        "mobilesdk_app_id": "1:976493563758:android:c86f69320a150d97637b7f",
         "android_client_info": {
           "package_name": "com.example.pm"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCLrR16PEHriyA_ckzQIVMKXEF06exOCjc"
+          "current_key": "AIzaSyBo5SCNvU7gaZpTq49nCxdS7jOrkjaW1Ss"
         }
       ],
       "services": {

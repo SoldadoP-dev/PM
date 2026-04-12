@@ -38,11 +38,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -52,6 +54,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import coil.compose.AsyncImage
 import com.example.pm.ui.theme.PMTheme
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -72,19 +75,21 @@ val CardGray = Color(0xFF1A1A1A)
 val InstaGradient = Brush.linearGradient(listOf(Color(0xFF833AB4), Color(0xFFFD1D1D), Color(0xFFFCAF45)))
 
 class MainActivity : ComponentActivity() {
+    private val repository = FirebaseRepository()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             PMTheme(darkTheme = true) {
-                AppNavigation()
+                AppNavigation(repository)
             }
         }
     }
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(repository: FirebaseRepository) {
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
     val startDestination = if (auth.currentUser == null) "login" else "main"
@@ -92,14 +97,12 @@ fun AppNavigation() {
     NavHost(
         navController = navController, 
         startDestination = startDestination,
-        enterTransition = { fadeIn(tween(400)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(400)) },
-        exitTransition = { fadeOut(tween(400)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(400)) },
-        popEnterTransition = { fadeIn(tween(400)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(400)) },
-        popExitTransition = { fadeOut(tween(400)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(400)) }
+        enterTransition = { fadeIn(tween(400)) },
+        exitTransition = { fadeOut(tween(400)) }
     ) {
         composable("login") { LoginScreen(navController) }
         composable("register") { RegisterScreen(navController) }
-        composable("main") { MainScreen(navController) }
+        composable("main") { MainScreen(navController, repository) }
         composable("notifications") { NotificationsScreen(navController) }
         
         composable("userList/{type}/{userId}") { backStackEntry ->
@@ -117,6 +120,72 @@ fun AppNavigation() {
         composable("otherProfile/{userId}") { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
             OtherProfileScreen(navController, userId)
+        }
+        
+        composable("storyView/{imageUrl}/{username}") { backStackEntry ->
+            val imageUrl = Uri.decode(backStackEntry.arguments?.getString("imageUrl") ?: "")
+            val username = backStackEntry.arguments?.getString("username") ?: ""
+            StoryViewScreen(navController, imageUrl, username)
+        }
+    }
+}
+
+@Composable
+fun StoryViewScreen(navController: NavHostController, imageUrl: String, username: String) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
+        
+        // Header con degradado para lectura
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 48.dp, start = 20.dp, end = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.size(40.dp).background(Color.Gray, CircleShape), contentAlignment = Alignment.Center) {
+                Text(username.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(username, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(32.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun UserAvatar(url: String?, username: String, size: Dp, onClick: (() -> Unit)? = null) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(CardGray)
+            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!url.isNullOrEmpty()) {
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Text(username.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.4).sp)
         }
     }
 }
@@ -243,7 +312,7 @@ fun RegisterScreen(navController: NavHostController) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(rootNavController: NavHostController) {
+fun MainScreen(rootNavController: NavHostController, repository: FirebaseRepository) {
     val navController = rememberNavController()
     val sheetState = rememberModalBottomSheetState()
     var selectedVenue by remember { mutableStateOf<Venue?>(null) }
@@ -273,7 +342,8 @@ fun MainScreen(rootNavController: NavHostController) {
                     selectedVenue = venue
                     showBottomSheet = true
                 },
-                rootNavController = rootNavController
+                rootNavController = rootNavController,
+                repository = repository
             )
             
             if (showBottomSheet && selectedVenue != null) {
@@ -330,33 +400,101 @@ fun NavigationGraph(
     isGhostMode: Boolean,
     onGhostModeChange: (Boolean) -> Unit,
     onVenueClick: (Venue) -> Unit,
-    rootNavController: NavHostController
+    rootNavController: NavHostController,
+    repository: FirebaseRepository
 ) {
     NavHost(navController, startDestination = "home") {
-        composable("home") { HomeScreen(onVenueClick) }
+        composable("home") { HomeScreen(onVenueClick, repository, rootNavController) }
         composable("search") { SearchScreen(rootNavController) }
         composable("messages") { MessagesListScreen(rootNavController) }
-        composable("profile") { ProfileScreen(isGhostMode, onGhostModeChange, rootNavController) }
+        composable("profile") { ProfileScreen(isGhostMode, onGhostModeChange, rootNavController, repository) }
     }
 }
 
 @Composable
-fun HomeScreen(onVenueClick: (Venue) -> Unit) {
+fun HomeScreen(onVenueClick: (Venue) -> Unit, repository: FirebaseRepository, rootNavController: NavHostController) {
     Column(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
-        StoriesRow()
+        StoriesRow(repository, rootNavController)
         MapSection(onVenueClick)
     }
 }
 
 @Composable
-fun StoriesRow() {
-    val stories = listOf("Tú", "Dani", "Elena", "Marc", "Sara", "Pau", "Lucas")
+fun StoriesRow(repository: FirebaseRepository, rootNavController: NavHostController) {
+    var currentUser by remember { mutableStateOf<User?>(null) }
+    val scope = rememberCoroutineScope()
+    
+    LaunchedEffect(Unit) {
+        currentUser = repository.getCurrentUser()
+    }
+    
+    val stories by repository.getStories(currentUser?.followingUids ?: emptyList()).collectAsState(initial = emptyList())
+    
+    // Agrupamos las historias por userId para mostrar solo un círculo por persona
+    val groupedStories = stories.groupBy { it.userId }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { 
+            scope.launch { 
+                try {
+                    repository.uploadStory(it)
+                    Toast.makeText(rootNavController.context, "Subiendo historia...", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(rootNavController.context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            } 
+        }
+    }
+
     LazyRow(
         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(stories) { name ->
+        // --- MI HISTORIA ---
+        item {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .border(2.dp, NeonPurple, CircleShape)
+                            .padding(4.dp)
+                            .clip(CircleShape)
+                            .background(Color.DarkGray)
+                            .clickable { launcher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!currentUser?.photoUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = currentUser?.photoUrl,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Text("Tú", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(NeonPurple, CircleShape)
+                            .border(2.dp, DeepSpace, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                    }
+                }
+                Text("Tú", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+        
+        // --- HISTORIAS DE OTROS ---
+        items(groupedStories.keys.toList().filter { it != currentUser?.uid }) { userId ->
+            val userStories = groupedStories[userId] ?: emptyList()
+            val latestStory = userStories.first() // Cogemos la más reciente
+            
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
@@ -364,12 +502,21 @@ fun StoriesRow() {
                         .border(2.dp, InstaGradient, CircleShape)
                         .padding(4.dp)
                         .clip(CircleShape)
-                        .background(Color.DarkGray),
+                        .background(Color.DarkGray)
+                        .clickable { 
+                            val encodedUrl = Uri.encode(latestStory.imageUrl)
+                            rootNavController.navigate("storyView/$encodedUrl/${latestStory.username}")
+                        },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(name.take(1), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    AsyncImage(
+                        model = latestStory.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
                 }
-                Text(name, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(latestStory.username, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -396,7 +543,7 @@ fun MapSection(onVenueClick: (Venue) -> Unit) {
 
     // --- CARGA DE DATOS ---
     LaunchedEffect(Unit) {
-        firestore.collection(" venues").addSnapshotListener { snapshot, error ->
+        firestore.collection("venues").addSnapshotListener { snapshot, error ->
             if (error != null) {
                 Toast.makeText(context, "ERROR FIRESTORE: ${error.message}", Toast.LENGTH_LONG).show()
                 return@addSnapshotListener
@@ -584,9 +731,7 @@ fun UserSearchItem(user: User, currentUser: User?, rootNavController: NavHostCon
         colors = CardDefaults.cardColors(containerColor = CardGray)
     ) {
         Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(45.dp).background(Color.DarkGray, CircleShape), contentAlignment = Alignment.Center) {
-                Text(user.username.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
-            }
+            UserAvatar(user.photoUrl, user.username, size = 45.dp)
             Spacer(modifier = Modifier.width(12.dp))
             Text(user.username, modifier = Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.SemiBold)
 
@@ -713,10 +858,12 @@ fun MessagesListScreen(rootNavController: NavHostController) {
             items(chats) { chat ->
                 val otherId = chat.participants.find { it != currentUserId } ?: ""
                 var otherName by remember { mutableStateOf("Cargando...") }
+                var otherPhoto by remember { mutableStateOf<String?>(null) }
                 
                 LaunchedEffect(otherId) {
                     firestore.collection("users").document(otherId).get().addOnSuccessListener { 
                         otherName = it.getString("username") ?: "Usuario"
+                        otherPhoto = it.getString("photoUrl")
                     }
                 }
 
@@ -728,7 +875,9 @@ fun MessagesListScreen(rootNavController: NavHostController) {
                     headlineContent = { Text(otherName, fontWeight = FontWeight.Bold, color = Color.White) },
                     supportingContent = { Text(chat.lastMessage, color = Color.Gray, maxLines = 1) },
                     leadingContent = { 
-                        Box(modifier = Modifier.size(56.dp).border(2.dp, NeonPurple, CircleShape).padding(3.dp).clip(CircleShape).background(Color.Gray)) 
+                        Box(modifier = Modifier.size(56.dp).border(2.dp, NeonPurple, CircleShape).padding(3.dp)) {
+                            UserAvatar(otherPhoto, otherName, size = 50.dp)
+                        }
                     },
                     colors = ListItemDefaults.colors(containerColor = DeepSpace)
                 )
@@ -822,10 +971,11 @@ fun ChatDetailScreen(navController: NavHostController, chatId: String, otherName
 }
 
 @Composable
-fun ProfileScreen(isGhostMode: Boolean, onGhostModeChange: (Boolean) -> Unit, rootNavController: NavHostController) {
+fun ProfileScreen(isGhostMode: Boolean, onGhostModeChange: (Boolean) -> Unit, rootNavController: NavHostController, repository: FirebaseRepository) {
     val auth = FirebaseAuth.getInstance()
     val firestore = FirebaseFirestore.getInstance()
     var user by remember { mutableStateOf<User?>(null) }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -836,10 +986,52 @@ fun ProfileScreen(isGhostMode: Boolean, onGhostModeChange: (Boolean) -> Unit, ro
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(modifier = Modifier.size(100.dp).border(3.dp, InstaGradient, CircleShape).padding(5.dp).background(Color.DarkGray, CircleShape), contentAlignment = Alignment.Center) {
-            Text(user?.username?.take(1)?.uppercase() ?: "?", fontSize = 40.sp, color = Color.White, fontWeight = FontWeight.Bold)
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { 
+            scope.launch { 
+                try {
+                    repository.updateProfilePicture(it)
+                    Toast.makeText(context, "Foto de perfil actualizada", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            } 
         }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(contentAlignment = Alignment.BottomEnd) {
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .border(3.dp, InstaGradient, CircleShape)
+                    .padding(5.dp)
+                    .background(Color.DarkGray, CircleShape)
+                    .clickable { launcher.launch("image/*") }, 
+                contentAlignment = Alignment.Center
+            ) {
+                if (!user?.photoUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = user?.photoUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(user?.username?.take(1)?.uppercase() ?: "?", fontSize = 40.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(NeonPurple, CircleShape)
+                    .border(2.dp, DeepSpace, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp), tint = Color.Black)
+            }
+        }
+        
         Text(user?.username ?: "Cargando...", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(top = 12.dp))
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -935,7 +1127,7 @@ fun UserListScreen(navController: NavHostController, type: String, userId: Strin
                 ListItem(
                     modifier = Modifier.clickable { navController.navigate("otherProfile/${user.uid}") },
                     headlineContent = { Text(user.username, fontWeight = FontWeight.Bold, color = Color.White) },
-                    leadingContent = { Box(modifier = Modifier.size(44.dp).background(Color.Gray, CircleShape)) },
+                    leadingContent = { UserAvatar(user.photoUrl, user.username, size = 44.dp) },
                     colors = ListItemDefaults.colors(containerColor = DeepSpace)
                 )
             }
@@ -974,9 +1166,7 @@ fun OtherProfileScreen(navController: NavHostController, userId: String) {
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(modifier = Modifier.size(100.dp).border(2.dp, InstaGradient, CircleShape).padding(4.dp).background(Color.DarkGray, CircleShape), contentAlignment = Alignment.Center) {
-                Text(user?.username?.take(1)?.uppercase() ?: "", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 32.sp)
-            }
+            UserAvatar(user?.photoUrl, user?.username ?: "", size = 100.dp)
             Text(user?.username ?: "", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
             
             Row(modifier = Modifier.padding(vertical = 24.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -1082,12 +1272,7 @@ fun VenueDetailSheet(venue: Venue, navController: NavHostController) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.clickable { navController.navigate("otherProfile/${attendee.uid}") }
                 ) {
-                    Box(
-                        modifier = Modifier.size(50.dp).background(Color.DarkGray, CircleShape).border(1.dp, if (attendee.uid == currentUserId) NeonPurple else Color.Transparent, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(attendee.username.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                    UserAvatar(attendee.photoUrl, attendee.username, size = 50.dp)
                     Text(if (attendee.uid == currentUserId) "Tú" else attendee.username, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
                 }
             }
