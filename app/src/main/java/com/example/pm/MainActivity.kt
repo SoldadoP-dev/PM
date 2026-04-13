@@ -27,6 +27,9 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -52,6 +55,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -198,8 +203,6 @@ class MainActivity : ComponentActivity() {
                                 notif.fromUserId,
                                 notif.fromUsername
                             )
-                            
-                            firestore.collection("notifications").document(change.document.id).update("isRead", true)
                         }
                     }
                 }
@@ -279,6 +282,8 @@ fun AppNavigation(repository: FirebaseRepository, navController: NavHostControll
             val postId = backStackEntry.arguments?.getString("postId") ?: ""
             PostDetailScreen(navController, postId, repository)
         }
+        
+        composable("settings") { SettingsScreen(navController) }
     }
 }
 
@@ -296,9 +301,13 @@ fun StoryViewScreen(navController: NavHostController, userId: String, repository
     }
 
     val currentStory = stories[currentIndex]
+    val progress = remember(currentIndex) { Animatable(0f) }
 
     LaunchedEffect(currentIndex) {
-        delay(5000) // 5 segundos por historia
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = 15000, easing = LinearEasing)
+        )
         if (currentIndex < stories.size - 1) {
             currentIndex++
         } else {
@@ -323,7 +332,7 @@ fun StoryViewScreen(navController: NavHostController, userId: String, repository
             model = currentStory.imageUrl,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Fit
         )
 
         // Indicadores de progreso
@@ -335,7 +344,7 @@ fun StoryViewScreen(navController: NavHostController, userId: String, repository
         ) {
             stories.forEachIndexed { index, _ ->
                 LinearProgressIndicator(
-                    progress = { if (index < currentIndex) 1f else if (index == currentIndex) 0.5f else 0f },
+                    progress = { if (index < currentIndex) 1f else if (index == currentIndex) progress.value else 0f },
                     modifier = Modifier
                         .weight(1f)
                         .height(2.dp)
@@ -400,7 +409,13 @@ fun LoginScreen(navController: NavHostController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("PM", fontSize = 64.sp, fontWeight = FontWeight.ExtraBold, color = NeonPurple)
+        Image(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = "App Logo",
+            modifier = Modifier.size(120.dp).clip(CircleShape).border(2.dp, NeonPurple, CircleShape)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("PM", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = NeonPurple)
         Text("Tu noche empieza aquí", color = Color.Gray, modifier = Modifier.padding(bottom = 48.dp))
 
         OutlinedTextField(
@@ -458,6 +473,12 @@ fun RegisterScreen(navController: NavHostController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Image(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = "App Logo",
+            modifier = Modifier.size(80.dp).clip(CircleShape).border(2.dp, NeonPurple, CircleShape)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
         Text("Únete a la Noche", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = NeonPurple)
         Spacer(modifier = Modifier.height(32.dp))
         OutlinedTextField(
@@ -510,8 +531,8 @@ fun RegisterScreen(navController: NavHostController) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(rootNavController: NavHostController, repository: FirebaseRepository) {
-    // 0: Story Camera, 1: Map/Home, 2: Feed/Novedades, 3: Search, 4: Chats, 5: Profile
-    val pagerState = rememberPagerState(initialPage = 1, pageCount = { 6 })
+    // 0: Map/Home, 1: Explore (Search+Feed), 2: Chats, 3: Profile
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState()
     var selectedVenue by remember { mutableStateOf<Venue?>(null) }
@@ -520,56 +541,74 @@ fun MainScreen(rootNavController: NavHostController, repository: FirebaseReposit
 
     Scaffold(
         topBar = {
-            if (pagerState.currentPage != 0) { // No mostrar barra en la cámara
-                TopAppBar(
-                    title = { Text("PM", fontWeight = FontWeight.ExtraBold, color = NeonPurple, fontSize = 24.sp) },
-                    actions = {
-                        IconButton(onClick = { rootNavController.navigate("notifications") }) {
-                            Icon(Icons.Default.FavoriteBorder, null, tint = Color.White)
+            var unreadNotifications by remember { mutableIntStateOf(0) }
+            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+            LaunchedEffect(currentUserId) {
+                if (currentUserId != null) {
+                    FirebaseFirestore.getInstance().collection("notifications")
+                        .whereEqualTo("toUserId", currentUserId)
+                        .whereEqualTo("isRead", false)
+                        .addSnapshotListener { snapshot, _ ->
+                            unreadNotifications = snapshot?.size() ?: 0
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
-                )
+                }
             }
-        },
-        bottomBar = { 
-            if (pagerState.currentPage != 0) {
-                BottomNavigationBar(
-                    selectedIndex = when (pagerState.currentPage) {
-                        1, 2 -> 0
-                        3 -> 1
-                        4 -> 2
-                        5 -> 3
-                        else -> 0
-                    },
-                    onItemSelected = { index ->
-                        scope.launch { 
-                            val target = when (index) {
-                                0 -> 1
-                                1 -> 3
-                                2 -> 4
-                                3 -> 5
-                                else -> 1
-                            }
-                            pagerState.animateScrollToPage(target) 
+
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo),
+                            contentDescription = "PM Logo",
+                            modifier = Modifier.size(32.dp).clip(CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("PM", fontWeight = FontWeight.ExtraBold, color = NeonPurple, fontSize = 24.sp)
+                    }
+                },
+                actions = {
+                    if (pagerState.currentPage == 3) {
+                        IconButton(onClick = { rootNavController.navigate("settings") }) {
+                            Icon(Icons.Default.Settings, null, tint = Color.White)
                         }
                     }
-                ) 
-            }
+                    IconButton(onClick = { rootNavController.navigate("notifications") }) {
+                        BadgedBox(
+                            badge = {
+                                if (unreadNotifications > 0) {
+                                    Badge(containerColor = NeonPink) {
+                                        Text(unreadNotifications.toString(), color = Color.White)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(if (unreadNotifications > 0) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (unreadNotifications > 0) NeonPink else Color.White)
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+            )
+        },
+        bottomBar = { 
+            BottomNavigationBar(
+                selectedIndex = pagerState.currentPage,
+                onItemSelected = { index ->
+                    scope.launch { 
+                        pagerState.animateScrollToPage(index) 
+                    }
+                }
+            ) 
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(if (pagerState.currentPage == 0) PaddingValues(0.dp) else innerPadding)) {
+        Box(modifier = Modifier.padding(innerPadding)) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
                 beyondViewportPageCount = 1,
-                userScrollEnabled = true
+                userScrollEnabled = false // Deshabilitar deslizamiento entre pestañas para evitar conflictos con el mapa
             ) { page ->
                 when (page) {
-                    0 -> StoryUploadScreen(repository) {
-                        scope.launch { pagerState.animateScrollToPage(1) }
-                    }
-                    1 -> HomeScreen(
+                    0 -> HomeScreen(
                         onVenueClick = { venue ->
                             selectedVenue = venue
                             showBottomSheet = true
@@ -577,10 +616,9 @@ fun MainScreen(rootNavController: NavHostController, repository: FirebaseReposit
                         repository = repository,
                         rootNavController = rootNavController
                     )
-                    2 -> FeedScreen(repository, rootNavController)
-                    3 -> SearchScreen(rootNavController)
-                    4 -> MessagesListScreen(rootNavController)
-                    5 -> ProfileScreen(isGhostMode, { isGhostMode = it }, rootNavController, repository)
+                    1 -> ExploreScreen(repository, rootNavController)
+                    2 -> MessagesListScreen(rootNavController)
+                    3 -> ProfileScreen(isGhostMode, { isGhostMode = it }, rootNavController, repository)
                 }
             }
             
@@ -650,7 +688,7 @@ fun StoryUploadScreen(repository: FirebaseRepository, onComplete: () -> Unit) {
 fun BottomNavigationBar(selectedIndex: Int, onItemSelected: (Int) -> Unit) {
     val items = listOf(
         Triple(0, Icons.Default.Map, "Mapa"),
-        Triple(1, Icons.Default.Search, "Buscar"),
+        Triple(1, Icons.Default.Search, "Explorar"),
         Triple(2, Icons.AutoMirrored.Filled.Chat, "Chats"),
         Triple(3, Icons.Default.Person, "Perfil")
     )
@@ -682,25 +720,75 @@ fun HomeScreen(onVenueClick: (Venue) -> Unit, repository: FirebaseRepository, ro
 }
 
 @Composable
-fun FeedScreen(repository: FirebaseRepository, rootNavController: NavHostController) {
-    val posts by repository.getGlobalPosts().collectAsState(initial = emptyList())
+fun ExploreScreen(repository: FirebaseRepository, rootNavController: NavHostController) {
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResult by remember { mutableStateOf<List<User>>(emptyList()) }
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    val firestore = FirebaseFirestore.getInstance()
+    var currentUser by remember { mutableStateOf<User?>(null) }
     
+    val posts by repository.getGlobalPosts().collectAsState(initial = emptyList())
+
+    LaunchedEffect(currentUserId) {
+        firestore.collection("users").document(currentUserId)
+            .addSnapshotListener { snapshot, _ ->
+                currentUser = snapshot?.toObject(User::class.java)
+            }
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
-        Text(
-            "Novedades", 
-            color = Color.White, 
-            fontWeight = FontWeight.Bold, 
-            modifier = Modifier.padding(16.dp),
-            fontSize = 24.sp
+        // Search Bar
+        OutlinedTextField(
+            value = searchQuery, 
+            onValueChange = { 
+                searchQuery = it
+                if (searchQuery.isNotBlank()) {
+                    firestore.collection("users")
+                        .whereGreaterThanOrEqualTo("username", searchQuery.lowercase())
+                        .whereLessThanOrEqualTo("username", searchQuery.lowercase() + "\uf8ff")
+                        .get()
+                        .addOnSuccessListener { result ->
+                            searchResult = result.toObjects(User::class.java).filter { it.uid != currentUserId }
+                        }
+                } else {
+                    searchResult = emptyList()
+                }
+            },
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            placeholder = { Text("Buscar amigos...") },
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = NeonPurple, 
+                unfocusedBorderColor = Color.DarkGray,
+                focusedContainerColor = CardGray,
+                unfocusedContainerColor = CardGray
+            )
         )
-        if (posts.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = NeonPurple)
+
+        if (searchQuery.isNotBlank()) {
+            // User search results
+            LazyColumn(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(searchResult) { user ->
+                    UserSearchItem(user, currentUser, rootNavController)
+                }
             }
         } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(posts) { post ->
-                    PostItem(post, rootNavController, repository)
+            // Explore Feed Grid (Instagram style)
+            if (posts.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = NeonPurple)
+                }
+            } else {
+                LazyVerticalStaggeredGrid(
+                    columns = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells.Fixed(2),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(1.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalItemSpacing = 2.dp
+                ) {
+                    items(posts) { post ->
+                        ExplorePostItem(post, rootNavController)
+                    }
                 }
             }
         }
@@ -708,26 +796,29 @@ fun FeedScreen(repository: FirebaseRepository, rootNavController: NavHostControl
 }
 
 @Composable
-fun PostItem(post: Post, navController: NavHostController, repository: FirebaseRepository) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(8.dp),
-        colors = CardDefaults.cardColors(containerColor = CardGray)
+fun ExplorePostItem(post: Post, navController: NavHostController) {
+    // Generate an irregular height (random seeded by post.id so it stays stable)
+    val randomHeight = remember(post.id) { (150..300).random().dp }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(randomHeight)
+            .clickable { navController.navigate("postDetail/${post.id}") }
     ) {
-        Column {
-            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                UserAvatar(null, post.username, 32.dp) {
-                    navController.navigate("otherProfile/${post.userId}")
-                }
-                Text(post.username, modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold, color = Color.White)
-            }
-            AsyncImage(
-                model = post.imageUrl,
-                contentDescription = null,
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable {
-                    navController.navigate("postDetail/${post.id}")
-                },
-                contentScale = ContentScale.Crop
-            )
+        AsyncImage(
+            model = post.imageUrl,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        // Pequeño indicador del autor si se desea, o solo foto
+        Box(modifier = Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)), startY = 100f)
+        ))
+        Row(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            UserAvatar(null, post.username, 20.dp)
+            Text(post.username, color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp), fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -735,12 +826,39 @@ fun PostItem(post: Post, navController: NavHostController, repository: FirebaseR
 @Composable
 fun StoriesRow(repository: FirebaseRepository, rootNavController: NavHostController) {
     var currentUser by remember { mutableStateOf<User?>(null) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var isUploading by remember { mutableStateOf(false) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) {
+            scope.launch {
+                isUploading = true
+                try {
+                    uris.forEach { uri ->
+                        repository.uploadStory(uri)
+                    }
+                    Toast.makeText(context, "Historia subida", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                } finally {
+                    isUploading = false
+                }
+            }
+        }
+    }
     
     LaunchedEffect(Unit) {
         currentUser = repository.getCurrentUser()
     }
     
-    val stories by repository.getStories(currentUser?.followingUids ?: emptyList()).collectAsState(initial = emptyList())
+    val stories by repository.getStories(
+        if (currentUser != null) {
+            val list = mutableListOf(currentUser!!.uid)
+            list.addAll(currentUser!!.followingUids)
+            list
+        } else emptyList()
+    ).collectAsState(initial = emptyList())
     val groupedStories = stories.groupBy { it.userId }
 
     LazyRow(
@@ -763,22 +881,27 @@ fun StoriesRow(repository: FirebaseRepository, rootNavController: NavHostControl
                             .clickable { 
                                 if (myStories.isNotEmpty()) {
                                     rootNavController.navigate("storyView/${currentUser?.uid}")
+                                } else {
+                                    galleryLauncher.launch("image/*")
                                 }
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        UserAvatar(currentUser?.photoUrl, currentUser?.username ?: "Tú", 70.dp)
-                    }
-                    if (myStories.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(NeonPurple, CircleShape)
-                                .border(2.dp, DeepSpace, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                        if (isUploading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = NeonPurple)
+                        } else {
+                            UserAvatar(currentUser?.photoUrl, currentUser?.username ?: "Tú", 70.dp)
                         }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(NeonPurple, CircleShape)
+                            .border(2.dp, DeepSpace, CircleShape)
+                            .clickable { galleryLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp), tint = Color.Black)
                     }
                 }
                 Text("Tu historia", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
@@ -788,24 +911,26 @@ fun StoriesRow(repository: FirebaseRepository, rootNavController: NavHostControl
         // --- HISTORIAS DE OTROS ---
         items(groupedStories.keys.toList().filter { it != currentUser?.uid }) { userId ->
             val userStories = groupedStories[userId] ?: emptyList()
-            val firstStory = userStories.first()
-            
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .border(3.dp, InstaGradient, CircleShape)
-                        .padding(5.dp)
-                        .clip(CircleShape)
-                        .background(Color.DarkGray)
-                        .clickable { 
-                            rootNavController.navigate("storyView/$userId")
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    UserAvatar(firstStory.userPhotoUrl, firstStory.username, 70.dp)
+            if (userStories.isNotEmpty()) {
+                val firstStory = userStories.first()
+                
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .border(3.dp, InstaGradient, CircleShape)
+                            .padding(5.dp)
+                            .clip(CircleShape)
+                            .background(Color.DarkGray)
+                            .clickable { 
+                                rootNavController.navigate("storyView/$userId")
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        UserAvatar(firstStory.userPhotoUrl, firstStory.username, 70.dp)
+                    }
+                    Text(firstStory.username, color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 }
-                Text(firstStory.username, color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -858,11 +983,21 @@ fun MapSection(onVenueClick: (Venue) -> Unit) {
     val filteredVenues = if (searchQuery.isBlank()) venues 
                          else venues.filter { it.name.contains(searchQuery, ignoreCase = true) || it.category.contains(searchQuery, ignoreCase = true) }
 
+    val sharedPrefs = context.getSharedPreferences("Settings", android.content.Context.MODE_PRIVATE)
+    val isDarkMap = sharedPrefs.getBoolean("dark_map", true)
+    
+    val mapStyleJson = if (isDarkMap) {
+        """[{"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#ffffff"}]},{"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#000000"},{"lightness":13}]},{"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#144b53"},{"lightness":14},{"weight":1.4}]},{"featureType":"landscape","elementType":"all","stylers":[{"color":"#08304b"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#0c4152"},{"lightness":5}]},{"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#0b434f"},{"lightness":25}]},{"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#0b3d51"},{"lightness":16}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"}]},{"featureType":"transit","elementType":"all","stylers":[{"color":"#146474"}]},{"featureType":"water","elementType":"all","stylers":[{"color":"#021019"}]}]"""
+    } else null
+
     Box(modifier = Modifier.fillMaxSize()) {
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
-            properties = MapProperties(isMyLocationEnabled = hasPermission),
+            properties = MapProperties(
+                isMyLocationEnabled = hasPermission,
+                mapStyleOptions = mapStyleJson?.let { com.google.android.gms.maps.model.MapStyleOptions(it) }
+            ),
             uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = true)
         ) {
             filteredVenues.forEach { venue ->
@@ -943,50 +1078,7 @@ fun MapSection(onVenueClick: (Venue) -> Unit) {
     }
 }
 
-@Composable
-fun SearchScreen(rootNavController: NavHostController) {
-    var searchQuery by remember { mutableStateOf("") }
-    var searchResult by remember { mutableStateOf<List<User>>(emptyList()) }
-    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-    val firestore = FirebaseFirestore.getInstance()
-    var currentUser by remember { mutableStateOf<User?>(null) }
 
-    LaunchedEffect(currentUserId) {
-        firestore.collection("users").document(currentUserId)
-            .addSnapshotListener { snapshot, _ ->
-                currentUser = snapshot?.toObject(User::class.java)
-            }
-    }
-
-    Column(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(16.dp)) {
-        OutlinedTextField(
-            value = searchQuery, 
-            onValueChange = { 
-                searchQuery = it
-                if (searchQuery.isNotBlank()) {
-                    firestore.collection("users")
-                        .whereGreaterThanOrEqualTo("username", searchQuery.lowercase())
-                        .whereLessThanOrEqualTo("username", searchQuery.lowercase() + "\uf8ff")
-                        .get()
-                        .addOnSuccessListener { result ->
-                            searchResult = result.toObjects(User::class.java).filter { it.uid != currentUserId }
-                        }
-                } else {
-                    searchResult = emptyList()
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Buscar amigos...") },
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray)
-        )
-
-        LazyColumn(modifier = Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(searchResult) { user ->
-                UserSearchItem(user, currentUser, rootNavController)
-            }
-        }
-    }
-}
 
 @Composable
 fun UserSearchItem(user: User, currentUser: User?, rootNavController: NavHostController) {
@@ -1058,7 +1150,9 @@ fun NotificationsScreen(navController: NavHostController) {
         firestore.collection("notifications")
             .whereEqualTo("toUserId", currentUserId)
             .addSnapshotListener { snapshot, _ ->
-                notifications = snapshot?.toObjects(ActivityNotification::class.java) ?: emptyList()
+                val list = snapshot?.toObjects(ActivityNotification::class.java) ?: emptyList()
+                // Sort client-side to avoid needing a Firestore composite index
+                notifications = list.sortedByDescending { it.timestamp }.take(50)
             }
     }
 
@@ -1069,6 +1163,21 @@ fun NotificationsScreen(navController: NavHostController) {
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                    }
+                },
+                actions = {
+                    TextButton(onClick = {
+                        scope.launch {
+                            val unreadDocs = firestore.collection("notifications")
+                                .whereEqualTo("toUserId", currentUserId)
+                                .whereEqualTo("isRead", false)
+                                .get().await()
+                            for (doc in unreadDocs.documents) {
+                                doc.reference.update("isRead", true)
+                            }
+                        }
+                    }) {
+                        Text("Leer todas", color = NeonPurple)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
@@ -1090,19 +1199,17 @@ fun NotificationsScreen(navController: NavHostController) {
                                 "followingUids", FieldValue.arrayUnion(currentUserId),
                                 "followingCount", FieldValue.increment(1)
                             )
-                            firestore.collection("notifications").document(notif.id).delete()
+                            firestore.collection("notifications").document(notif.id).update("isRead", true)
                         }
                     },
                     onClick = {
+                        firestore.collection("notifications").document(notif.id).update("isRead", true)
                         when(notif.type) {
                             "like", "comment" -> navController.navigate("postDetail/${notif.targetId}")
                             "message" -> {
                                 navController.navigate("chat/${notif.targetId}/${notif.fromUsername}/${notif.fromUserId}")
                             }
                             "follow_request" -> navController.navigate("otherProfile/${notif.fromUserId}")
-                        }
-                        if (notif.type != "follow_request") {
-                            firestore.collection("notifications").document(notif.id).delete()
                         }
                     }
                 )
@@ -1114,7 +1221,9 @@ fun NotificationsScreen(navController: NavHostController) {
 @Composable
 fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick: () -> Unit) {
     ListItem(
-        modifier = Modifier.clickable { onClick() },
+        modifier = Modifier
+            .background(if (!notif.isRead) NeonPurple.copy(alpha = 0.05f) else Color.Transparent)
+            .clickable { onClick() },
         headlineContent = { 
             Text(
                 text = when(notif.type) {
@@ -1124,7 +1233,7 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
                     "message" -> "${notif.fromUsername} te envió un mensaje"
                     else -> notif.fromUsername
                 },
-                fontWeight = FontWeight.Bold, 
+                fontWeight = if (!notif.isRead) FontWeight.ExtraBold else FontWeight.Normal, 
                 color = Color.White,
                 fontSize = 14.sp
             ) 
@@ -1132,24 +1241,30 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
         supportingContent = { 
             Text(
                 text = when(notif.type) {
-                    "follow_request" -> "Haz clic para aceptar"
-                    "message" -> notif.content
-                    else -> "Hace un momento"
+                    "follow_request" -> "Toca para ver el perfil"
+                    "message", "comment" -> notif.content
+                    else -> "Nueva actividad"
                 },
                 color = Color.Gray,
-                fontSize = 12.sp
+                fontSize = 12.sp,
+                maxLines = 1
             ) 
         },
         trailingContent = {
-            if (notif.type == "follow_request") {
-                Button(
-                    onClick = onAccept, 
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple), 
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(32.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                ) {
-                    Text("Aceptar", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (notif.type == "follow_request") {
+                    Button(
+                        onClick = onAccept, 
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonPurple), 
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                    ) {
+                        Text("Aceptar", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+                if (!notif.isRead) {
+                    Box(modifier = Modifier.size(10.dp).background(NeonPink, CircleShape))
                 }
             }
         },
@@ -1166,7 +1281,8 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
                         "like" -> Icons.Default.Favorite
                         "comment" -> Icons.Default.Comment
                         "message" -> Icons.AutoMirrored.Filled.Chat
-                        else -> Icons.Default.Person
+                        "follow_request" -> Icons.Default.PersonAdd
+                        else -> Icons.Default.Notifications
                     },
                     contentDescription = null,
                     tint = if (notif.type == "like") NeonPink else NeonPurple,
@@ -1174,7 +1290,7 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
                 )
             }
         },
-        colors = ListItemDefaults.colors(containerColor = DeepSpace)
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
 }
 
@@ -1199,49 +1315,84 @@ fun MessagesListScreen(rootNavController: NavHostController) {
         }
         LazyColumn {
             items(chats) { chat ->
-                val otherId = chat.participants.find { it != currentUserId } ?: ""
-                var otherName by remember { mutableStateOf("Cargando...") }
-                var otherPhoto by remember { mutableStateOf<String?>(null) }
-
-                LaunchedEffect(otherId) {
-                    firestore.collection("users").document(otherId).get().addOnSuccessListener {
-                        otherName = it.getString("username") ?: "Usuario"
-                        otherPhoto = it.getString("photoUrl")
-                    }
-                }
-
-                ListItem(
-                    modifier = Modifier.clickable {
-                        val encodedName = Uri.encode(otherName)
-                        rootNavController.navigate("chat/${chat.id}/$encodedName/$otherId")
-                    },
-                    headlineContent = {
-                        Text(
-                            otherName,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    },
-                    supportingContent = {
-                        Text(
-                            chat.lastMessage,
-                            color = Color.Gray,
-                            maxLines = 1
-                        )
-                    },
-                    leadingContent = {
-                        Box(
-                            modifier = Modifier.size(56.dp).border(2.dp, NeonPurple, CircleShape)
-                                .padding(3.dp)
-                        ) {
-                            UserAvatar(otherPhoto, otherName, size = 50.dp)
-                        }
-                    },
-                    colors = ListItemDefaults.colors(containerColor = DeepSpace)
-                )
+                ChatItem(chat, currentUserId, rootNavController)
             }
         }
     }
+}
+
+@Composable
+fun ChatItem(chat: ChatRoom, currentUserId: String, rootNavController: NavHostController) {
+    val firestore = FirebaseFirestore.getInstance()
+    val otherId = chat.participants.find { it != currentUserId } ?: ""
+    var otherName by remember { mutableStateOf("Cargando...") }
+    var otherPhoto by remember { mutableStateOf<String?>(null) }
+    var unreadCount by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(otherId) {
+        firestore.collection("users").document(otherId).get().addOnSuccessListener {
+            otherName = it.getString("username") ?: "Usuario"
+            otherPhoto = it.getString("photoUrl")
+        }
+    }
+
+    LaunchedEffect(chat.id) {
+        firestore.collection("chats").document(chat.id).collection("messages")
+            .whereEqualTo("isRead", false)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    unreadCount = snapshot.documents.count { it.getString("senderId") != currentUserId }
+                }
+            }
+    }
+
+    ListItem(
+        modifier = Modifier.clickable {
+            val encodedName = Uri.encode(otherName)
+            rootNavController.navigate("chat/${chat.id}/$encodedName/$otherId")
+        },
+        headlineContent = {
+            Text(
+                otherName,
+                fontWeight = if (unreadCount > 0) FontWeight.ExtraBold else FontWeight.Bold,
+                color = Color.White
+            )
+        },
+        supportingContent = {
+            Text(
+                chat.lastMessage,
+                fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.Normal,
+                color = if (unreadCount > 0) Color.White else Color.Gray,
+                maxLines = 1
+            )
+        },
+        trailingContent = {
+            if (unreadCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(NeonPink, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = unreadCount.toString(),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        },
+        leadingContent = {
+            Box(
+                modifier = Modifier.size(56.dp).border(2.dp, NeonPurple, CircleShape)
+                    .padding(3.dp)
+            ) {
+                UserAvatar(otherPhoto, otherName, size = 50.dp)
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = DeepSpace)
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1267,6 +1418,13 @@ fun ChatDetailScreen(navController: NavHostController, chatId: String, otherName
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, _ ->
                 messages = snapshot?.toObjects(Message::class.java) ?: emptyList()
+                
+                // Mark unread messages as read
+                snapshot?.documents?.forEach { doc ->
+                    if (doc.getString("senderId") != currentUserId && doc.getBoolean("isRead") == false) {
+                        doc.reference.update("isRead", true)
+                    }
+                }
             }
     }
 
@@ -1308,7 +1466,7 @@ fun ChatDetailScreen(navController: NavHostController, chatId: String, otherName
             )
         },
         bottomBar = {
-            Surface(color = Color.Black, modifier = Modifier.imePadding()) {
+            Surface(color = Color.Black, modifier = Modifier.navigationBarsPadding().imePadding()) {
                 Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { mediaLauncher.launch("*/*") }) {
                         Icon(Icons.Default.AddCircleOutline, null, tint = NeonPurple)
@@ -1361,7 +1519,7 @@ fun ChatBubble(msg: Message, isMe: Boolean) {
                         model = msg.imageUrl,
                         contentDescription = null,
                         modifier = Modifier.sizeIn(maxWidth = 200.dp, maxHeight = 300.dp).clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Fit
                     )
                 }
                 if (!msg.videoUrl.isNullOrEmpty()) {
@@ -1697,7 +1855,7 @@ fun PostDetailScreen(navController: NavHostController, postId: String, repositor
             )
         },
         bottomBar = {
-            Surface(color = Color.Black, modifier = Modifier.imePadding()) {
+            Surface(color = Color.Black, modifier = Modifier.navigationBarsPadding().imePadding()) {
                 Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     TextField(
                         value = commentText, onValueChange = { commentText = it },
@@ -1731,8 +1889,8 @@ fun PostDetailScreen(navController: NavHostController, postId: String, repositor
                         AsyncImage(
                             model = p.imageUrl,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                            contentScale = ContentScale.Crop
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
+                            contentScale = ContentScale.Fit
                         )
                         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             val isLiked = p.likedBy.contains(currentUserId)
@@ -1836,5 +1994,81 @@ fun VenueDetailSheet(venue: Venue, navController: NavHostController) {
             Text(if (isAttending) "ESTOY APUNTADO" else "¡ME APUNTO!", color = if (isAttending) Color.White else Color.Black, fontWeight = FontWeight.ExtraBold)
         }
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(navController: NavHostController) {
+    val context = LocalContext.current
+    val sharedPrefs = context.getSharedPreferences("Settings", android.content.Context.MODE_PRIVATE)
+    
+    var isDarkMap by remember { mutableStateOf(sharedPrefs.getBoolean("dark_map", true)) }
+    var isEnglish by remember { mutableStateOf(sharedPrefs.getBoolean("is_english", false)) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Ajustes", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+            )
+        }
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding).padding(16.dp)) {
+            Text("Preferencias de la App", color = NeonPurple, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
+            
+            // Map Theme
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (isDarkMap) Icons.Default.DarkMode else Icons.Default.LightMode, null, tint = Color.White)
+                Text("Mapa Oscuro", color = Color.White, modifier = Modifier.weight(1f).padding(start = 16.dp), fontSize = 16.sp)
+                Switch(
+                    checked = isDarkMap,
+                    onCheckedChange = {
+                        isDarkMap = it
+                        sharedPrefs.edit().putBoolean("dark_map", it).apply()
+                    },
+                    colors = SwitchDefaults.colors(checkedThumbColor = NeonPurple, checkedTrackColor = NeonPurple.copy(alpha = 0.5f))
+                )
+            }
+            
+            HorizontalDivider(color = Color.DarkGray)
+            
+            // Language
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Language, null, tint = Color.White)
+                Text("Idioma Inglés", color = Color.White, modifier = Modifier.weight(1f).padding(start = 16.dp), fontSize = 16.sp)
+                Switch(
+                    checked = isEnglish,
+                    onCheckedChange = {
+                        isEnglish = it
+                        sharedPrefs.edit().putBoolean("is_english", it).apply()
+                        
+                        // En Compose se requiere usar strings.xml para traducir. Mostramos mensaje.
+                        Toast.makeText(context, "Requiere extraer textos a strings.xml (Próximamente)", Toast.LENGTH_LONG).show()
+                    },
+                    colors = SwitchDefaults.colors(checkedThumbColor = NeonPurple, checkedTrackColor = NeonPurple.copy(alpha = 0.5f))
+                )
+            }
+
+            HorizontalDivider(color = Color.DarkGray)
+            
+            // Ghost Mode stub
+            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.VisibilityOff, null, tint = Color.White)
+                Text("Modo Fantasma", color = Color.White, modifier = Modifier.weight(1f).padding(start = 16.dp), fontSize = 16.sp)
+                Switch(
+                    checked = false,
+                    onCheckedChange = {
+                        Toast.makeText(context, "Disponible en PM Premium", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = SwitchDefaults.colors(checkedThumbColor = NeonPurple, checkedTrackColor = NeonPurple.copy(alpha = 0.5f))
+                )
+            }
+        }
     }
 }

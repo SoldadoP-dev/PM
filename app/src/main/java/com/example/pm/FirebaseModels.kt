@@ -75,7 +75,8 @@ data class Message(
     val text: String = "",
     val imageUrl: String? = null,
     val videoUrl: String? = null,
-    val timestamp: Timestamp = Timestamp.now()
+    val timestamp: Timestamp = Timestamp.now(),
+    @get:PropertyName("isRead") @set:PropertyName("isRead") var isRead: Boolean = false
 )
 
 /**
