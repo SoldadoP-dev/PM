@@ -23,13 +23,8 @@ class FirebaseRepository {
     }
 
     suspend fun uploadImage(uri: Uri, path: String): String {
-        // Generamos un nombre único con extensión .jpg
         val ref = storage.reference.child(path).child("${UUID.randomUUID()}.jpg")
-        
-        // Subimos el archivo
         ref.putFile(uri).await()
-        
-        // Pedimos la URL de descarga una vez confirmada la subida
         return ref.downloadUrl.await().toString()
     }
 
@@ -45,6 +40,7 @@ class FirebaseRepository {
         val story = Story(
             userId = user.uid,
             username = user.username,
+            userPhotoUrl = user.photoUrl,
             imageUrl = url,
             expiresAt = Timestamp(System.currentTimeMillis() / 1000 + 86400, 0) // 24h
         )
@@ -52,7 +48,9 @@ class FirebaseRepository {
     }
 
     suspend fun getVenues(): List<Venue> {
-        return firestore.collection("venues").get().await().toObjects(Venue::class.java)
+        // Se tiene en cuenta el espacio en blanco si fuera necesario, 
+        // aunque en el query manual de MainActivity ya se gestiona.
+        return firestore.collection(" venues").get().await().toObjects(Venue::class.java)
     }
 
     suspend fun toggleAttendance(venueId: String) {
@@ -95,7 +93,7 @@ class FirebaseRepository {
             return@callbackFlow
         }
 
-        // Firestore 'whereIn' supports up to 10 elements. 
+        // Firestore 'whereIn' supports up to 10 elements.
         val query = if (allUids.size <= 10) {
             firestore.collection("stories")
                 .whereIn("userId", allUids)
@@ -112,6 +110,20 @@ class FirebaseRepository {
                 ?.filter { it.expiresAt > currentTime } ?: emptyList()
             trySend(stories)
         }
+        awaitClose { listener.remove() }
+    }
+
+    fun getStoriesByUser(userId: String): Flow<List<Story>> = callbackFlow {
+        val listener = firestore.collection("stories")
+            .whereEqualTo("userId", userId)
+            .orderBy("expiresAt", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                val currentTime = Timestamp.now()
+                val stories = snapshot?.toObjects(Story::class.java)
+                    ?.filter { it.expiresAt > currentTime } ?: emptyList()
+                trySend(stories)
+            }
         awaitClose { listener.remove() }
     }
 
@@ -155,7 +167,6 @@ class FirebaseRepository {
             "lastTimestamp", Timestamp.now()
         ).await()
 
-        // Notificar al otro usuario
         val chatDoc = firestore.collection("chats").document(chatId).get().await()
         val participants = chatDoc.get("participants") as? List<String> ?: emptyList()
         val otherId = participants.find { it != uid }
@@ -176,13 +187,10 @@ class FirebaseRepository {
     }
 
     suspend fun sendNotification(notification: ActivityNotification) {
-        if (notification.toUserId == notification.fromUserId) return // No notificar a uno mismo
-        
+        if (notification.toUserId == notification.fromUserId) return
         val ref = firestore.collection("notifications").document()
         ref.set(notification.copy(id = ref.id, timestamp = Timestamp.now())).await()
     }
-
-    // --- Funciones de Publicaciones (Estilo Instagram) ---
 
     suspend fun createPost(uri: Uri, caption: String) {
         val user = getCurrentUser() ?: return
@@ -217,35 +225,12 @@ class FirebaseRepository {
         firestore.runTransaction { transaction ->
             val snapshot = transaction.get(postRef)
             val post = snapshot.toObject(Post::class.java) ?: return@runTransaction
-            
             val newLikedBy = post.likedBy.toMutableList()
-            val wasLiked = newLikedBy.contains(uid)
-            
-            if (wasLiked) {
-                newLikedBy.remove(uid)
-            } else {
-                newLikedBy.add(uid)
-            }
-            
+            if (newLikedBy.contains(uid)) newLikedBy.remove(uid) else newLikedBy.add(uid)
             transaction.update(postRef, "likedBy", newLikedBy)
             transaction.update(postRef, "likesCount", newLikedBy.size)
-
-            // Si es un nuevo like y no es mi propio post, notificar
-            if (!wasLiked && post.userId != uid) {
-                val notif = ActivityNotification(
-                    fromUserId = uid,
-                    fromUsername = user.username,
-                    toUserId = post.userId,
-                    type = "like",
-                    targetId = postId
-                )
-                // Las transacciones no deben llamar a funciones suspend directamente de forma externa fácilmente, 
-                // pero podemos escribir el doc de notificación aquí mismo o fuera.
-                // Para simplicidad, lo haremos fuera de la transacción si ésta tiene éxito.
-            }
         }.await()
 
-        // Notificación después del like
         val postDoc = postRef.get().await().toObject(Post::class.java)
         if (postDoc != null && postDoc.likedBy.contains(uid) && postDoc.userId != uid) {
             sendNotification(ActivityNotification(
@@ -269,7 +254,6 @@ class FirebaseRepository {
         )
         firestore.collection("posts").document(postId).collection("comments").add(comment).await()
 
-        // Notificar al dueño del post
         val postDoc = firestore.collection("posts").document(postId).get().await().toObject(Post::class.java)
         if (postDoc != null && postDoc.userId != user.uid) {
             sendNotification(ActivityNotification(

@@ -18,6 +18,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -47,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -75,6 +77,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.maps.android.compose.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlin.text.contains
@@ -267,10 +270,9 @@ fun AppNavigation(repository: FirebaseRepository, navController: NavHostControll
             OtherProfileScreen(navController, userId, repository)
         }
         
-        composable("storyView/{imageUrl}/{username}") { backStackEntry ->
-            val imageUrl = Uri.decode(backStackEntry.arguments?.getString("imageUrl") ?: "")
-            val username = backStackEntry.arguments?.getString("username") ?: ""
-            StoryViewScreen(navController, imageUrl, username)
+        composable("storyView/{userId}") { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            StoryViewScreen(navController, userId, repository)
         }
 
         composable("postDetail/{postId}") { backStackEntry ->
@@ -281,37 +283,82 @@ fun AppNavigation(repository: FirebaseRepository, navController: NavHostControll
 }
 
 @Composable
-fun StoryViewScreen(navController: NavHostController, imageUrl: String, username: String) {
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+fun StoryViewScreen(navController: NavHostController, userId: String, repository: FirebaseRepository) {
+    val stories by repository.getStoriesByUser(userId).collectAsState(initial = emptyList())
+    var currentIndex by remember { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    if (stories.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = NeonPurple)
+        }
+        return
+    }
+
+    val currentStory = stories[currentIndex]
+
+    LaunchedEffect(currentIndex) {
+        delay(5000) // 5 segundos por historia
+        if (currentIndex < stories.size - 1) {
+            currentIndex++
+        } else {
+            navController.popBackStack()
+        }
+    }
+
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(Color.Black)
+        .pointerInput(Unit) {
+            detectTapGestures { offset ->
+                if (offset.x < size.width / 3) {
+                    if (currentIndex > 0) currentIndex-- else navController.popBackStack()
+                } else {
+                    if (currentIndex < stories.size - 1) currentIndex++ else navController.popBackStack()
+                }
+            }
+        }
+    ) {
         AsyncImage(
-            model = imageUrl,
+            model = currentStory.imageUrl,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit
-        )
-        
-        // Header con degradado para lectura
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)))
+            contentScale = ContentScale.Crop
         )
 
+        // Indicadores de progreso
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 48.dp, start = 20.dp, end = 12.dp),
+                .padding(top = 40.dp, start = 8.dp, end = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            stories.forEachIndexed { index, _ ->
+                LinearProgressIndicator(
+                    progress = { if (index < currentIndex) 1f else if (index == currentIndex) 0.5f else 0f },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp)),
+                    color = Color.White,
+                    trackColor = Color.White.copy(alpha = 0.3f),
+                )
+            }
+        }
+
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 60.dp, start = 16.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(modifier = Modifier.size(40.dp).background(Color.Gray, CircleShape), contentAlignment = Alignment.Center) {
-                Text(username.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
-            }
+            UserAvatar(currentStory.userPhotoUrl, currentStory.username, 40.dp)
             Spacer(modifier = Modifier.width(12.dp))
-            Text(username, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+            Text(currentStory.username, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                Icon(Icons.Default.Close, null, tint = Color.White)
             }
         }
     }
@@ -463,7 +510,8 @@ fun RegisterScreen(navController: NavHostController) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(rootNavController: NavHostController, repository: FirebaseRepository) {
-    val pagerState = rememberPagerState(pageCount = { 4 })
+    // 0: Story Camera, 1: Map/Home, 2: Feed/Novedades, 3: Search, 4: Chats, 5: Profile
+    val pagerState = rememberPagerState(initialPage = 1, pageCount = { 6 })
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState()
     var selectedVenue by remember { mutableStateOf<Venue?>(null) }
@@ -472,34 +520,56 @@ fun MainScreen(rootNavController: NavHostController, repository: FirebaseReposit
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("PM", fontWeight = FontWeight.ExtraBold, color = NeonPurple, fontSize = 24.sp) },
-                actions = {
-                    IconButton(onClick = { rootNavController.navigate("notifications") }) {
-                        Icon(Icons.Default.FavoriteBorder, null, tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
-            )
+            if (pagerState.currentPage != 0) { // No mostrar barra en la cámara
+                TopAppBar(
+                    title = { Text("PM", fontWeight = FontWeight.ExtraBold, color = NeonPurple, fontSize = 24.sp) },
+                    actions = {
+                        IconButton(onClick = { rootNavController.navigate("notifications") }) {
+                            Icon(Icons.Default.FavoriteBorder, null, tint = Color.White)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                )
+            }
         },
         bottomBar = { 
-            BottomNavigationBar(
-                selectedIndex = pagerState.currentPage,
-                onItemSelected = { index ->
-                    scope.launch { pagerState.animateScrollToPage(index) }
-                }
-            ) 
+            if (pagerState.currentPage != 0) {
+                BottomNavigationBar(
+                    selectedIndex = when (pagerState.currentPage) {
+                        1, 2 -> 0
+                        3 -> 1
+                        4 -> 2
+                        5 -> 3
+                        else -> 0
+                    },
+                    onItemSelected = { index ->
+                        scope.launch { 
+                            val target = when (index) {
+                                0 -> 1
+                                1 -> 3
+                                2 -> 4
+                                3 -> 5
+                                else -> 1
+                            }
+                            pagerState.animateScrollToPage(target) 
+                        }
+                    }
+                ) 
+            }
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
+        Box(modifier = Modifier.padding(if (pagerState.currentPage == 0) PaddingValues(0.dp) else innerPadding)) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                beyondViewportPageCount = 3,
-                userScrollEnabled = pagerState.currentPage != 0 // Desactivamos scroll manual en el mapa para que no interfiera
+                beyondViewportPageCount = 1,
+                userScrollEnabled = true
             ) { page ->
                 when (page) {
-                    0 -> HomeScreen(
+                    0 -> StoryUploadScreen(repository) {
+                        scope.launch { pagerState.animateScrollToPage(1) }
+                    }
+                    1 -> HomeScreen(
                         onVenueClick = { venue ->
                             selectedVenue = venue
                             showBottomSheet = true
@@ -507,9 +577,10 @@ fun MainScreen(rootNavController: NavHostController, repository: FirebaseReposit
                         repository = repository,
                         rootNavController = rootNavController
                     )
-                    1 -> SearchScreen(rootNavController)
-                    2 -> MessagesListScreen(rootNavController)
-                    3 -> ProfileScreen(isGhostMode, { isGhostMode = it }, rootNavController, repository)
+                    2 -> FeedScreen(repository, rootNavController)
+                    3 -> SearchScreen(rootNavController)
+                    4 -> MessagesListScreen(rootNavController)
+                    5 -> ProfileScreen(isGhostMode, { isGhostMode = it }, rootNavController, repository)
                 }
             }
             
@@ -522,6 +593,53 @@ fun MainScreen(rootNavController: NavHostController, repository: FirebaseReposit
                     shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
                 ) {
                     VenueDetailSheet(selectedVenue!!, rootNavController)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StoryUploadScreen(repository: FirebaseRepository, onComplete: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var isUploading by remember { mutableStateOf(false) }
+    
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) {
+            scope.launch {
+                isUploading = true
+                try {
+                    uris.forEach { uri ->
+                        repository.uploadStory(uri)
+                    }
+                    Toast.makeText(context, "Historias subidas", Toast.LENGTH_SHORT).show()
+                    onComplete()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                } finally {
+                    isUploading = false
+                }
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+        if (isUploading) {
+            CircularProgressIndicator(color = NeonPurple)
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.CameraAlt, null, tint = Color.White, modifier = Modifier.size(80.dp).clickable {
+                    galleryLauncher.launch("image/*")
+                })
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Desliza a la derecha para el mapa", color = Color.Gray)
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = { galleryLauncher.launch("image/*") },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
+                ) {
+                    Text("Seleccionar de Galería", color = Color.Black)
                 }
             }
         }
@@ -557,26 +675,33 @@ fun BottomNavigationBar(selectedIndex: Int, onItemSelected: (Int) -> Unit) {
 fun HomeScreen(onVenueClick: (Venue) -> Unit, repository: FirebaseRepository, rootNavController: NavHostController) {
     Column(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
         StoriesRow(repository, rootNavController)
-        MapSection(onVenueClick)
-        FeedSection(repository, rootNavController)
+        Box(modifier = Modifier.weight(1f)) {
+            MapSection(onVenueClick)
+        }
     }
 }
 
 @Composable
-fun FeedSection(repository: FirebaseRepository, rootNavController: NavHostController) {
+fun FeedScreen(repository: FirebaseRepository, rootNavController: NavHostController) {
     val posts by repository.getGlobalPosts().collectAsState(initial = emptyList())
     
-    if (posts.isNotEmpty()) {
+    Column(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
         Text(
             "Novedades", 
             color = Color.White, 
             fontWeight = FontWeight.Bold, 
             modifier = Modifier.padding(16.dp),
-            fontSize = 20.sp
+            fontSize = 24.sp
         )
-        LazyColumn(modifier = Modifier.fillMaxWidth().height(400.dp)) {
-            items(posts) { post ->
-                PostItem(post, rootNavController, repository)
+        if (posts.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = NeonPurple)
+            }
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(posts) { post ->
+                    PostItem(post, rootNavController, repository)
+                }
             }
         }
     }
@@ -584,9 +709,6 @@ fun FeedSection(repository: FirebaseRepository, rootNavController: NavHostContro
 
 @Composable
 fun PostItem(post: Post, navController: NavHostController, repository: FirebaseRepository) {
-    val scope = rememberCoroutineScope()
-    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-    
     Card(
         modifier = Modifier.fillMaxWidth().padding(8.dp),
         colors = CardDefaults.cardColors(containerColor = CardGray)
@@ -613,29 +735,13 @@ fun PostItem(post: Post, navController: NavHostController, repository: FirebaseR
 @Composable
 fun StoriesRow(repository: FirebaseRepository, rootNavController: NavHostController) {
     var currentUser by remember { mutableStateOf<User?>(null) }
-    val scope = rememberCoroutineScope()
     
     LaunchedEffect(Unit) {
         currentUser = repository.getCurrentUser()
     }
     
     val stories by repository.getStories(currentUser?.followingUids ?: emptyList()).collectAsState(initial = emptyList())
-    
-    // Agrupamos las historias por userId para mostrar solo un círculo por persona
     val groupedStories = stories.groupBy { it.userId }
-
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { 
-            scope.launch { 
-                try {
-                    repository.uploadStory(it)
-                    Toast.makeText(rootNavController.context, "Subiendo historia...", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(rootNavController.context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            } 
-        }
-    }
 
     LazyRow(
         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
@@ -644,70 +750,62 @@ fun StoriesRow(repository: FirebaseRepository, rootNavController: NavHostControl
     ) {
         // --- MI HISTORIA ---
         item {
+            val myStories = groupedStories[currentUser?.uid] ?: emptyList()
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(contentAlignment = Alignment.BottomEnd) {
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
-                            .border(2.dp, NeonPurple, CircleShape)
-                            .padding(4.dp)
+                            .size(80.dp)
+                            .border(3.dp, if (myStories.isNotEmpty()) InstaGradient else Brush.linearGradient(listOf(Color.Gray, Color.Gray)), CircleShape)
+                            .padding(5.dp)
                             .clip(CircleShape)
                             .background(Color.DarkGray)
-                            .clickable { launcher.launch("image/*") },
+                            .clickable { 
+                                if (myStories.isNotEmpty()) {
+                                    rootNavController.navigate("storyView/${currentUser?.uid}")
+                                }
+                            },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!currentUser?.photoUrl.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = currentUser?.photoUrl,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Text("Tú", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        UserAvatar(currentUser?.photoUrl, currentUser?.username ?: "Tú", 70.dp)
+                    }
+                    if (myStories.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(NeonPurple, CircleShape)
+                                .border(2.dp, DeepSpace, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp), tint = Color.Black)
                         }
                     }
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .background(NeonPurple, CircleShape)
-                            .border(2.dp, DeepSpace, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp), tint = Color.Black)
-                    }
                 }
-                Text("Tú", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Text("Tu historia", color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
         
         // --- HISTORIAS DE OTROS ---
         items(groupedStories.keys.toList().filter { it != currentUser?.uid }) { userId ->
             val userStories = groupedStories[userId] ?: emptyList()
-            val latestStory = userStories.first() // Cogemos la más reciente
+            val firstStory = userStories.first()
             
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
-                        .border(2.dp, InstaGradient, CircleShape)
-                        .padding(4.dp)
+                        .size(80.dp)
+                        .border(3.dp, InstaGradient, CircleShape)
+                        .padding(5.dp)
                         .clip(CircleShape)
                         .background(Color.DarkGray)
                         .clickable { 
-                            val encodedUrl = Uri.encode(latestStory.imageUrl)
-                            rootNavController.navigate("storyView/$encodedUrl/${latestStory.username}")
+                            rootNavController.navigate("storyView/$userId")
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    AsyncImage(
-                        model = latestStory.imageUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
+                    UserAvatar(firstStory.userPhotoUrl, firstStory.username, 70.dp)
                 }
-                Text(latestStory.username, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(firstStory.username, color = Color.White, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -732,54 +830,24 @@ fun MapSection(onVenueClick: (Venue) -> Unit) {
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasPermission = it }
 
-    // --- CARGA DE DATOS ROBUSTA ---
     LaunchedEffect(Unit) {
-        val currentProjectId = firestore.app.options.projectId
-        android.util.Log.d("DIAGNOSTIC", "Conectado al proyecto: $currentProjectId")
-        Toast.makeText(context, "Debug: Proyecto $currentProjectId", Toast.LENGTH_LONG).show()
-
-        // Intentamos con todos los fallos típicos de escritura (incluyendo espacios)
-        val collectionNames = listOf("venues", "Venues", " venues", "venues ", " Venues", "Venues ")
+        val collectionNames = listOf(" venues", "venues", "Venues")
         
         collectionNames.forEach { colName ->
             firestore.collection(colName).addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("FIRESTORE_ERROR", "Error en $colName: ${error.message}")
-                    return@addSnapshotListener
-                }
-
-                if (snapshot != null && !snapshot.isEmpty) {
-                    android.util.Log.d("FIRESTORE_DATA", "¡Datos encontrados en '$colName'! (${snapshot.size()} docs)")
-                    
-                    val loaded = snapshot.documents.mapNotNull { doc ->
-                        try {
-                            // Mapeo manual campo por campo para evitar errores de tipo
-                            Venue(
-                                id = doc.id,
-                                name = doc.getString("name") ?: doc.getString("Name") ?: "Sin nombre",
-                                location = doc.getGeoPoint("location") ?: com.google.firebase.firestore.GeoPoint(40.41, -3.70),
-                                address = doc.getString("address") ?: doc.getString("Address") ?: "Madrid",
-                                rating = (doc.get("rating") ?: doc.get("Rating") ?: 0.0).toString().toDoubleOrNull() ?: 0.0,
-                                category = doc.getString("Category") ?: doc.getString("category") ?: "Club"
-                            )
-                        } catch (e: Exception) {
-                            android.util.Log.e("FIRESTORE_ERROR", "Fallo al parsear ${doc.id}: ${e.message}")
-                            null
-                        }
-                    }
-                    
-                    if (loaded.isNotEmpty()) {
-                        venues = loaded
-                        // Si hay locales, movemos la cámara al primero para ver si aparecen
-                        scope.launch {
-                            val first = loaded.first()
-                            cameraPositionState.animate(
-                                CameraUpdateFactory.newLatLngZoom(LatLng(first.location.latitude, first.location.longitude), 12f)
-                            )
-                        }
-                    }
-                } else {
-                    android.util.Log.d("FIRESTORE_DATA", "La colección '$colName' está vacía.")
+                if (error != null || snapshot == null || snapshot.isEmpty) return@addSnapshotListener
+                
+                venues = snapshot.documents.mapNotNull { doc ->
+                    try {
+                        Venue(
+                            id = doc.id,
+                            name = doc.getString("name") ?: doc.getString("Name") ?: "Sin nombre",
+                            location = doc.getGeoPoint("location") ?: com.google.firebase.firestore.GeoPoint(40.41, -3.70),
+                            address = doc.getString("address") ?: doc.getString("Address") ?: "Madrid",
+                            rating = (doc.get("rating") ?: doc.get("Rating") ?: 0.0).toString().toDoubleOrNull() ?: 0.0,
+                            category = doc.getString("Category") ?: doc.getString("category") ?: "Club"
+                        )
+                    } catch (e: Exception) { null }
                 }
             }
         }
@@ -801,9 +869,8 @@ fun MapSection(onVenueClick: (Venue) -> Unit) {
                 Marker(
                     state = MarkerState(position = LatLng(venue.location.latitude, venue.location.longitude)),
                     title = venue.name,
-                    snippet = venue.address, // Mostramos la dirección en el globo del marcador
                     onClick = { 
-                        onVenueClick(venue) // Abre el panel de "Quién va", "Apuntarse", etc.
+                        onVenueClick(venue)
                         scope.launch {
                             cameraPositionState.animate(
                                 CameraUpdateFactory.newLatLngZoom(LatLng(venue.location.latitude, venue.location.longitude), 16f), 1000
@@ -824,9 +891,9 @@ fun MapSection(onVenueClick: (Venue) -> Unit) {
                 .zIndex(5f)
         ) {
             Card(
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.9f)),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(25.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.8f)),
                 border = androidx.compose.foundation.BorderStroke(1.dp, NeonPurple.copy(alpha = 0.5f))
             ) {
                 Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -847,89 +914,27 @@ fun MapSection(onVenueClick: (Venue) -> Unit) {
                         ),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(
-                            onSearch = {
-                                if (filteredVenues.isNotEmpty()) {
-                                    val venue = filteredVenues.first()
-                                    onVenueClick(venue)
-                                    scope.launch {
-                                        cameraPositionState.animate(
-                                            CameraUpdateFactory.newLatLngZoom(LatLng(venue.location.latitude, venue.location.longitude), 16f), 1000
-                                        )
-                                    }
-                                    focusManager.clearFocus()
-                                }
-                            }
-                        )
+                        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
                     )
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, null, tint = Color.Gray)
-                        }
-                    }
                 }
             }
 
-            AnimatedVisibility(
-                visible = searchQuery.isNotBlank(),
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
+            AnimatedVisibility(visible = searchQuery.isNotBlank()) {
                 Card(
-                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth().heightIn(max = 280.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = CardGray.copy(alpha = 0.98f)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.DarkGray)
+                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth().heightIn(max = 200.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardGray.copy(alpha = 0.9f))
                 ) {
-                    if (filteredVenues.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                            Text("No se encontró nada", color = Color.Gray)
-                        }
-                    } else {
-                        LazyColumn {
-                            items(
-                                filteredVenues
-                            ) { venue ->
-                                ListItem(
-                                    modifier = Modifier.clickable {
-                                        onVenueClick(venue)
-                                        scope.launch {
-                                            cameraPositionState.animate(
-                                                CameraUpdateFactory.newLatLngZoom(
-                                                    LatLng(
-                                                        venue.location.latitude,
-                                                        venue.location.longitude
-                                                    ), 16f
-                                                ), 1000
-                                            )
-                                        }
-                                        searchQuery = ""
-                                        focusManager.clearFocus()
-                                    },
-                                    headlineContent = {
-                                        Text(
-                                            venue.name,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    },
-                                    supportingContent = {
-                                        Text(
-                                            venue.category,
-                                            color = NeonPurple,
-                                            fontSize = 12.sp
-                                        )
-                                    },
-                                    leadingContent = {
-                                        Icon(
-                                            Icons.Default.LocalBar,
-                                            null,
-                                            tint = Color.Gray
-                                        )
-                                    },
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                                )
-                            }
+                    LazyColumn {
+                        items(filteredVenues) { venue ->
+                            ListItem(
+                                modifier = Modifier.clickable {
+                                    onVenueClick(venue)
+                                    searchQuery = ""
+                                    focusManager.clearFocus()
+                                },
+                                headlineContent = { Text(venue.name, color = Color.White) },
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            )
                         }
                     }
                 }
@@ -1543,21 +1548,10 @@ fun UserListScreen(navController: NavHostController, type: String, userId: Strin
         }
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding)) {
-            items(users.filter {
-                it.username.contains(
-                    searchQuery,
-                    true
-                )
-            }) { user ->
+            items(users.filter { it.username.contains(searchQuery, true) }) { user ->
                 ListItem(
                     modifier = Modifier.clickable { navController.navigate("otherProfile/${user.uid}") },
-                    headlineContent = {
-                        Text(
-                            user.username,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    },
+                    headlineContent = { Text(user.username, fontWeight = FontWeight.Bold, color = Color.White) },
                     leadingContent = { UserAvatar(user.photoUrl, user.username, size = 44.dp) },
                     colors = ListItemDefaults.colors(containerColor = DeepSpace)
                 )
@@ -1625,9 +1619,7 @@ fun OtherProfileScreen(navController: NavHostController, userId: String, reposit
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isFollowing || isPending) Color.DarkGray else NeonPurple
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isFollowing || isPending) Color.DarkGray else NeonPurple)
                     ) {
                         Text(
                             text = when {
@@ -1669,9 +1661,7 @@ fun PostGrid(posts: List<Post>, onPostClick: (Post) -> Unit) {
             AsyncImage(
                 model = post.imageUrl,
                 contentDescription = null,
-                modifier = Modifier
-                    .aspectRatio(1f)
-                    .clickable { onPostClick(post) },
+                modifier = Modifier.aspectRatio(1f).clickable { onPostClick(post) },
                 contentScale = ContentScale.Crop
             )
         }
@@ -1708,23 +1698,12 @@ fun PostDetailScreen(navController: NavHostController, postId: String, repositor
         },
         bottomBar = {
             Surface(color = Color.Black, modifier = Modifier.imePadding()) {
-                Row(
-                    modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     TextField(
-                        value = commentText,
-                        onValueChange = { commentText = it },
+                        value = commentText, onValueChange = { commentText = it },
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("Añadir comentario...", color = Color.Gray) },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = CardGray,
-                            unfocusedContainerColor = CardGray,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
+                        colors = TextFieldDefaults.colors(focusedContainerColor = CardGray, unfocusedContainerColor = CardGray, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                         shape = RoundedCornerShape(24.dp)
                     )
                     IconButton(onClick = {
@@ -1741,12 +1720,7 @@ fun PostDetailScreen(navController: NavHostController, postId: String, repositor
             }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(DeepSpace)
-                .padding(padding)
-        ) {
+        LazyColumn(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding)) {
             item {
                 post?.let { p ->
                     Column {
@@ -1763,34 +1737,20 @@ fun PostDetailScreen(navController: NavHostController, postId: String, repositor
                         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             val isLiked = p.likedBy.contains(currentUserId)
                             IconButton(onClick = { scope.launch { repository.toggleLike(postId) } }) {
-                                Icon(
-                                    if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    contentDescription = null,
-                                    tint = if (isLiked) NeonPink else Color.White
-                                )
+                                Icon(if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = null, tint = if (isLiked) NeonPink else Color.White)
                             }
                             Text("${p.likesCount} likes", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                         if (p.caption.isNotEmpty()) {
-                            Text(
-                                text = p.caption,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                color = Color.White
-                            )
+                            Text(text = p.caption, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = Color.White)
                         }
-                        Divider(color = Color.DarkGray, modifier = Modifier.padding(top = 8.dp))
+                        HorizontalDivider(color = Color.DarkGray, modifier = Modifier.padding(top = 8.dp))
                     }
                 }
             }
             items(comments) { comment ->
                 ListItem(
-                    headlineContent = {
-                        Text(
-                            comment.username,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    },
+                    headlineContent = { Text(comment.username, fontWeight = FontWeight.Bold, color = Color.White) },
                     supportingContent = { Text(comment.text, color = Color.White) },
                     leadingContent = { UserAvatar(null, comment.username, 32.dp) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
@@ -1844,23 +1804,11 @@ fun VenueDetailSheet(venue: Venue, navController: NavHostController) {
         }
         
         Text("¿Quién va hoy?", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(top = 24.dp))
-        LazyRow(
-            modifier = Modifier.padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        LazyRow(modifier = Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             items(attendees) { attendee ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable { navController.navigate("otherProfile/${attendee.uid}") }
-                ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { navController.navigate("otherProfile/${attendee.uid}") }) {
                     UserAvatar(attendee.photoUrl, attendee.username, size = 50.dp)
-                    Text(
-                        if (attendee.uid == currentUserId) "Tú" else attendee.username,
-                        fontSize = 11.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    Text(if (attendee.uid == currentUserId) "Tú" else attendee.username, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
                 }
             }
             if (attendees.isEmpty()) {
@@ -1872,10 +1820,7 @@ fun VenueDetailSheet(venue: Venue, navController: NavHostController) {
             onClick = {
                 scope.launch {
                     if (isAttending) {
-                        val snapshot = firestore.collection("attendances")
-                            .whereEqualTo("userId", currentUserId)
-                            .whereEqualTo("venueId", venue.id)
-                            .get().await()
+                        val snapshot = firestore.collection("attendances").whereEqualTo("userId", currentUserId).whereEqualTo("venueId", venue.id).get().await()
                         snapshot.documents.forEach { it.reference.delete().await() }
                     } else {
                         firestore.collection("attendances").add(Attendance(userId = currentUserId, venueId = venue.id)).await()

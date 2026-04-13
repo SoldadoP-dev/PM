@@ -7,11 +7,6 @@ import com.google.firebase.firestore.PropertyName
 
 /**
  * Representa a un usuario en la plataforma.
- * @property uid Identificador único de Firebase Auth.
- * @property username Nombre único para mostrar.
- * @property followingUids Lista de IDs de personas a las que sigue el usuario.
- * @property followerUids Lista de IDs de personas que siguen al usuario.
- * @property pendingFollowRequests Solicitudes de seguimiento recibidas y no aceptadas.
  */
 data class User(
     @DocumentId val uid: String = "",
@@ -28,7 +23,6 @@ data class User(
 
 /**
  * Representa un local nocturno (discoteca, bar, club).
- * @property location Punto geográfico (Latitud/Longitud) para el mapa.
  */
 data class Venue(
     @DocumentId var id: String = "",
@@ -57,6 +51,7 @@ data class Story(
     @DocumentId val id: String = "",
     val userId: String = "",
     val username: String = "", 
+    val userPhotoUrl: String = "", // Añadido para mostrar perfil en los círculos
     val imageUrl: String = "",
     val expiresAt: Timestamp = Timestamp.now()
 )
@@ -84,22 +79,22 @@ data class Message(
 )
 
 /**
- * Notificación de actividad (Seguimiento, Solicitudes, etc.).
+ * Notificación de actividad.
  */
 data class ActivityNotification(
     @DocumentId val id: String = "",
     val fromUserId: String = "",
     val fromUsername: String = "",
     val toUserId: String = "",
-    val type: String = "", // "follow_request", "like", "comment", "message"
-    val content: String = "", // Para mostrar previsualización del mensaje o comentario
-    val targetId: String = "", // ID del post o del chat relacionado
+    val type: String = "", 
+    val content: String = "", 
+    val targetId: String = "", 
     val timestamp: Timestamp = Timestamp.now(),
     val isRead: Boolean = false
 )
 
 /**
- * Publicación permanente en el perfil (estilo Instagram).
+ * Publicación permanente en el perfil.
  */
 data class Post(
     @DocumentId val id: String = "",
@@ -109,7 +104,7 @@ data class Post(
     val caption: String = "",
     val timestamp: Timestamp = Timestamp.now(),
     val likesCount: Int = 0,
-    val likedBy: List<String> = emptyList() // Lista de UIDs que han dado like
+    val likedBy: List<String> = emptyList()
 )
 
 /**
