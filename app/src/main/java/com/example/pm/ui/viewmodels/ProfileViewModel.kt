@@ -48,9 +48,9 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun createPost(uri: Uri, caption: String) {
+    fun createPost(uri: Uri, caption: String, isVideo: Boolean) {
         viewModelScope.launch {
-            repository.createPost(uri, caption)
+            repository.createPost(uri, caption, isVideo)
         }
     }
 

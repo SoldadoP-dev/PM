@@ -1,16 +1,22 @@
 package com.example.pm
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,7 +25,8 @@ import javax.inject.Singleton
 class FirebaseRepository @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
-    private val storage: FirebaseStorage
+    private val storage: FirebaseStorage,
+    @ApplicationContext private val context: Context
 ) {
 
     fun getCurrentUserFlow(): Flow<User?> = callbackFlow {
@@ -46,27 +53,57 @@ class FirebaseRepository @Inject constructor(
         return firestore.collection("users").document(userId).get().await().toObject(User::class.java)
     }
 
-    suspend fun uploadImage(uri: Uri, path: String): String {
-        val ref = storage.reference.child(path).child("${UUID.randomUUID()}.jpg")
+    suspend fun uploadFile(uri: Uri, path: String, isVideo: Boolean = false): String {
+        val extension = if (isVideo) "mp4" else "jpg"
+        val ref = storage.reference.child(path).child("${UUID.randomUUID()}.$extension")
         ref.putFile(uri).await()
         return ref.downloadUrl.await().toString()
     }
 
+    private suspend fun uploadBitmap(bitmap: Bitmap, path: String): String = withContext(Dispatchers.IO) {
+        val baos = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+        val data = baos.toByteArray()
+        val ref = storage.reference.child(path).child("${UUID.randomUUID()}.jpg")
+        ref.putBytes(data).await()
+        return@withContext ref.downloadUrl.await().toString()
+    }
+
+    private suspend fun generateVideoThumbnail(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, uri)
+            retriever.getFrameAtTime(1000000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        } catch (e: Exception) {
+            null
+        } finally {
+            retriever.release()
+        }
+    }
+
     suspend fun updateProfilePicture(uri: Uri) {
         val uid = auth.currentUser?.uid ?: return
-        val url = uploadImage(uri, "profile_pics")
+        val url = uploadFile(uri, "profile_pics")
         firestore.collection("users").document(uid).update("photoUrl", url).await()
     }
 
-    suspend fun uploadStory(uri: Uri) {
+    suspend fun uploadStory(uri: Uri, isVideo: Boolean = false) {
         val user = getCurrentUser() ?: return
-        val url = uploadImage(uri, "stories")
+        val videoUrl = if (isVideo) uploadFile(uri, "stories", true) else null
+        val imageUrl = if (isVideo) {
+            val bitmap = generateVideoThumbnail(uri)
+            if (bitmap != null) uploadBitmap(bitmap, "stories_thumbnails") else ""
+        } else {
+            uploadFile(uri, "stories", false)
+        }
+
         val story = Story(
             userId = user.uid,
             username = user.username,
             userPhotoUrl = user.photoUrl,
-            imageUrl = url,
-            expiresAt = Timestamp(System.currentTimeMillis() / 1000 + 86400, 0) // 24h
+            imageUrl = imageUrl,
+            videoUrl = videoUrl,
+            expiresAt = Timestamp(System.currentTimeMillis() / 1000 + 86400, 0)
         )
         firestore.collection("stories").add(story).await()
     }
@@ -100,9 +137,6 @@ class FirebaseRepository @Inject constructor(
             return@callbackFlow
         }
 
-        // Si hay más de 10 seguidos, Firestore no permite 'whereIn'. 
-        // En una app real, haríamos queries por lotes o usaríamos otra estructura.
-        // Para que sea funcional y seguro, filtraremos client-side si superamos el límite.
         val query = if (allUids.size <= 10) {
             firestore.collection("stories")
                 .whereIn("userId", allUids)
@@ -110,7 +144,7 @@ class FirebaseRepository @Inject constructor(
         } else {
             firestore.collection("stories")
                 .orderBy("expiresAt", Query.Direction.DESCENDING)
-                .limit(100) // Evitar traer demasiados datos
+                .limit(100)
         }
 
         val listener = query.addSnapshotListener { snapshot, error ->
@@ -119,7 +153,6 @@ class FirebaseRepository @Inject constructor(
             var stories = snapshot?.toObjects(Story::class.java)
                 ?.filter { it.expiresAt > currentTime } ?: emptyList()
             
-            // Si superamos los 10, filtramos manualmente por seguridad y precisión
             if (allUids.size > 10) {
                 stories = stories.filter { allUids.contains(it.userId) }
             }
@@ -152,13 +185,6 @@ class FirebaseRepository @Inject constructor(
                 trySend(messages)
             }
         awaitClose { listener.remove() }
-    }
-
-    suspend fun uploadFile(uri: Uri, folder: String): String {
-        val extension = if (folder == "videos") "mp4" else "jpg"
-        val ref = storage.reference.child(folder).child("${UUID.randomUUID()}.$extension")
-        ref.putFile(uri).await()
-        return ref.downloadUrl.await().toString()
     }
 
     suspend fun sendMessage(chatId: String, text: String, imageUrl: String? = null, videoUrl: String? = null) {
@@ -217,14 +243,22 @@ class FirebaseRepository @Inject constructor(
         ref.set(notification.copy(id = ref.id, timestamp = Timestamp.now())).await()
     }
 
-    suspend fun createPost(uri: Uri, caption: String) {
+    suspend fun createPost(uri: Uri, caption: String, isVideo: Boolean = false) {
         val user = getCurrentUser() ?: return
-        val imageUrl = uploadImage(uri, "posts")
+        val videoUrl = if (isVideo) uploadFile(uri, "posts", true) else null
+        val imageUrl = if (isVideo) {
+            val bitmap = generateVideoThumbnail(uri)
+            if (bitmap != null) uploadBitmap(bitmap, "posts_thumbnails") else ""
+        } else {
+            uploadFile(uri, "posts", false)
+        }
+
         val post = Post(
             userId = user.uid,
             username = user.username,
             userPhotoUrl = user.photoUrl,
             imageUrl = imageUrl,
+            videoUrl = videoUrl,
             caption = caption,
             timestamp = Timestamp.now()
         )

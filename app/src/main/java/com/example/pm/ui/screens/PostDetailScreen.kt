@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.pm.ui.components.UserAvatar
+import com.example.pm.ui.components.VideoPlayer
 import com.example.pm.ui.theme.CardGray
 import com.example.pm.ui.theme.DeepSpace
 import com.example.pm.ui.theme.NeonPink
@@ -93,12 +94,23 @@ fun PostDetailScreen(
                             UserAvatar(null, p.username, 32.dp)
                             Text(p.username, modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold, color = Color.White)
                         }
-                        AsyncImage(
-                            model = p.imageUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
-                            contentScale = ContentScale.Fit
-                        )
+                        
+                        Box(modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp)) {
+                            if (p.videoUrl != null) {
+                                VideoPlayer(
+                                    videoUrl = p.videoUrl,
+                                    modifier = Modifier.fillMaxWidth().height(400.dp)
+                                )
+                            } else if (p.imageUrl != null) {
+                                AsyncImage(
+                                    model = p.imageUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                        }
+
                         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             val isLiked = p.likedBy.contains(currentUserId)
                             IconButton(onClick = { viewModel.toggleLike(postId) }) {

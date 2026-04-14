@@ -53,6 +53,7 @@ data class Story(
     val username: String = "", 
     val userPhotoUrl: String = "", 
     val imageUrl: String = "",
+    val videoUrl: String? = null, // Soporte para video en stories
     val expiresAt: Timestamp = Timestamp.now()
 )
 
@@ -103,7 +104,8 @@ data class Post(
     val userId: String = "",
     val username: String = "",
     val userPhotoUrl: String = "",
-    val imageUrl: String = "",
+    val imageUrl: String? = null,
+    val videoUrl: String? = null, // Soporte para video en posts
     val caption: String = "",
     val timestamp: Timestamp = Timestamp.now(),
     val likesCount: Int = 0,

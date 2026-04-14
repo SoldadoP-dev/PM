@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,14 +46,18 @@ fun ProfileScreen(
     val user by viewModel.user.collectAsState()
     val posts by viewModel.posts.collectAsState()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    var showMediaPicker by remember { mutableStateOf(false) }
 
     val profileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { viewModel.updateProfilePicture(it) }
     }
 
-    val postLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { viewModel.createPost(it, "") }
+    val mediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            val type = context.contentResolver.getType(it)
+            val isVideo = type?.contains("video") == true
+            viewModel.createPost(it, "", isVideo)
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
@@ -107,7 +112,7 @@ fun ProfileScreen(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = { postLauncher.launch("image/*") },
+                    onClick = { mediaLauncher.launch("*/*") },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
@@ -145,12 +150,22 @@ fun PostGrid(posts: List<Post>, onPostClick: (Post) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
         items(posts) { post ->
-            AsyncImage(
-                model = post.imageUrl,
-                contentDescription = null,
-                modifier = Modifier.aspectRatio(1f).clickable { onPostClick(post) },
-                contentScale = ContentScale.Crop
-            )
+            Box(modifier = Modifier.aspectRatio(1f).clickable { onPostClick(post) }) {
+                AsyncImage(
+                    model = post.imageUrl ?: post.videoUrl, // Muestra thumbnail si es video (Coil maneja thumbnails de video básicos)
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                if (post.videoUrl != null) {
+                    Icon(
+                        Icons.Default.PlayCircle,
+                        null,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp),
+                        tint = Color.White
+                    )
+                }
+            }
         }
     }
 }

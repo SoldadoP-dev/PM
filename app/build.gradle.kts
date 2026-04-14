@@ -76,6 +76,23 @@ dependencies {
 
     // Coil for image loading
     implementation(libs.coil.compose)
+
+    // Paging 3
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
+
+    // Room
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.room.paging)
+    kapt(libs.androidx.room.compiler)
+
+    // Media3 (ExoPlayer)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+
+    // Gson
+    implementation(libs.google.code.gson)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

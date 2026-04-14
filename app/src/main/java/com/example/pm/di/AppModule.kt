@@ -1,5 +1,6 @@
 package com.example.pm.di
 
+import android.content.Context
 import com.example.pm.FirebaseRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -8,6 +9,7 @@ import com.google.firebase.storage.FirebaseStorage
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -36,6 +38,7 @@ object AppModule {
     fun provideFirebaseRepository(
         auth: FirebaseAuth,
         firestore: FirebaseFirestore,
-        storage: FirebaseStorage
-    ): FirebaseRepository = FirebaseRepository(auth, firestore, storage)
+        storage: FirebaseStorage,
+        @ApplicationContext context: Context
+    ): FirebaseRepository = FirebaseRepository(auth, firestore, storage, context)
 }
