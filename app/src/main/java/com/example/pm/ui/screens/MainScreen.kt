@@ -103,7 +103,7 @@ fun MainScreen(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
                 beyondViewportPageCount = 1,
-                userScrollEnabled = true // Ahora permite deslizar entre Mapa, Explorar, Chats y Perfil
+                userScrollEnabled = pagerState.currentPage != 0 // No permitir scroll desde el mapa para no interferir con Google Maps
             ) { page ->
                 when (page) {
                     0 -> HomeScreen(

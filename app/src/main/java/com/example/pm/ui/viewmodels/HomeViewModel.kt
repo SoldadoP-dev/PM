@@ -80,11 +80,13 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun uploadStory(uri: Uri) {
+    fun uploadStory(uri: Uri, isVideo: Boolean = false) {
         viewModelScope.launch {
             _isUploadingStory.value = true
             try {
-                repository.uploadStory(uri)
+                repository.uploadStory(uri, isVideo)
+            } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "Error uploading story", e)
             } finally {
                 _isUploadingStory.value = false
             }

@@ -76,6 +76,7 @@ fun ChatDetailScreen(
     }
 
     val isOtherTyping = chatRoom?.typingUsers?.get(otherId) == true
+    val isUploadingMedia by viewModel.isUploadingMedia.collectAsState()
 
     val mediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
@@ -150,6 +151,13 @@ fun ChatDetailScreen(
             items(messages) { msg ->
                 val isMe = msg.senderId == viewModel.currentUserId
                 ChatBubble(msg, isMe)
+            }
+            if (isUploadingMedia) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.CenterEnd) {
+                        CircularProgressIndicator(color = NeonPurple, modifier = Modifier.size(24.dp))
+                    }
+                }
             }
             if (isOtherTyping) {
                 item {

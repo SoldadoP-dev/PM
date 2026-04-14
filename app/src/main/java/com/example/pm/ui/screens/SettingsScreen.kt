@@ -30,8 +30,9 @@ import com.example.pm.ui.theme.NeonPurple
 fun SettingsScreen(navController: NavHostController) {
     val context = LocalContext.current
     val sharedPrefs = context.getSharedPreferences("Settings", Context.MODE_PRIVATE)
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
     
-    var isDarkMap by remember { mutableStateOf(sharedPrefs.getBoolean("dark_map", true)) }
+    var isDarkMap by remember { mutableStateOf(sharedPrefs.getBoolean("dark_map", systemDark)) }
     var isEnglish by remember { mutableStateOf(sharedPrefs.getBoolean("is_english", false)) }
 
     Scaffold(

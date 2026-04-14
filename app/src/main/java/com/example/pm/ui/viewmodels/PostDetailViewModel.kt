@@ -41,6 +41,25 @@ class PostDetailViewModel @Inject constructor(
     }
 
     fun toggleLike(postId: String) {
+        val currentPost = _post.value ?: return
+        val currentLikedBy = currentPost.likedBy.toMutableList()
+        val wasLiked = currentLikedBy.contains(currentUserId)
+        var newLikesCount = currentPost.likesCount
+        
+        if (wasLiked) {
+            currentLikedBy.remove(currentUserId)
+            newLikesCount--
+        } else {
+            currentLikedBy.add(currentUserId)
+            newLikesCount++
+        }
+        
+        // Optimistic UI update
+        _post.value = currentPost.copy(
+            likedBy = currentLikedBy,
+            likesCount = newLikesCount
+        )
+
         viewModelScope.launch {
             repository.toggleLike(postId)
         }

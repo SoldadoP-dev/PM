@@ -32,6 +32,9 @@ class ChatViewModel @Inject constructor(
     private val _chatRoom = MutableStateFlow<ChatRoom?>(null)
     val chatRoom: StateFlow<ChatRoom?> = _chatRoom
 
+    private val _isUploadingMedia = MutableStateFlow(false)
+    val isUploadingMedia: StateFlow<Boolean> = _isUploadingMedia
+
     fun loadChat(chatId: String, otherId: String) {
         viewModelScope.launch {
             _otherUser.value = repository.getOtherUser(otherId)
@@ -65,12 +68,17 @@ class ChatViewModel @Inject constructor(
 
     fun sendMedia(chatId: String, uri: Uri, isVideo: Boolean) {
         viewModelScope.launch {
-            val folder = if (isVideo) "videos" else "chat_media"
-            val url = repository.uploadFile(uri, folder)
-            if (isVideo) {
-                repository.sendMessage(chatId, "", videoUrl = url)
-            } else {
-                repository.sendMessage(chatId, "", imageUrl = url)
+            _isUploadingMedia.value = true
+            try {
+                val folder = if (isVideo) "videos" else "chat_media"
+                val url = repository.uploadFile(uri, folder)
+                if (isVideo) {
+                    repository.sendMessage(chatId, "", videoUrl = url)
+                } else {
+                    repository.sendMessage(chatId, "", imageUrl = url)
+                }
+            } finally {
+                _isUploadingMedia.value = false
             }
         }
     }

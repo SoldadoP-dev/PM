@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import kotlinx.coroutines.FlowPreview
+
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class ExploreViewModel @Inject constructor(
     private val repository: FirebaseRepository,
@@ -30,9 +33,23 @@ class ExploreViewModel @Inject constructor(
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser
 
+    private val searchQuery = MutableStateFlow("")
+
     init {
         loadGlobalPosts()
         loadCurrentUser()
+        observeSearchQuery()
+    }
+
+    private fun observeSearchQuery() {
+        viewModelScope.launch {
+            searchQuery
+                .debounce(500)
+                .distinctUntilChanged()
+                .collectLatest { query ->
+                    executeSearch(query)
+                }
+        }
     }
 
     private fun loadGlobalPosts() {
@@ -52,6 +69,10 @@ class ExploreViewModel @Inject constructor(
     }
 
     fun searchUsers(query: String) {
+        searchQuery.value = query
+    }
+
+    private fun executeSearch(query: String) {
         if (query.isBlank()) {
             _searchResults.value = emptyList()
             return

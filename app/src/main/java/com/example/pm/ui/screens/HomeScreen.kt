@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -72,9 +73,12 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
     val isUploading by viewModel.isUploadingStory.collectAsState()
     val context = LocalContext.current
 
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
         if (uris.isNotEmpty()) {
-            uris.forEach { viewModel.uploadStory(it) }
+            uris.forEach { uri -> 
+                val isVideo = context.contentResolver.getType(uri)?.startsWith("video") == true
+                viewModel.uploadStory(uri, isVideo) 
+            }
             Toast.makeText(context, context.getString(R.string.story_uploaded), Toast.LENGTH_SHORT).show()
         }
     }
@@ -101,7 +105,7 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
                                 if (myStories.isNotEmpty()) {
                                     rootNavController.navigate("storyView/${currentUser?.uid}")
                                 } else {
-                                    galleryLauncher.launch("image/*")
+                                    galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                                 }
                             },
                         contentAlignment = Alignment.Center
@@ -117,7 +121,7 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
                             .size(24.dp)
                             .background(NeonPurple, CircleShape)
                             .border(2.dp, DeepSpace, CircleShape)
-                            .clickable { galleryLauncher.launch("image/*") },
+                            .clickable { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp), tint = Color.Black)
@@ -156,34 +160,48 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
 @SuppressLint("MissingPermission")
 @Composable
 fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
-    val context = LocalContext.current
-    val focusManager = LocalFocusManager.current
-    val scope = rememberCoroutineScope()
-    val venues by viewModel.venues.collectAsState()
-    
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(LatLng(40.4168, -3.7038), 14f)
-    }
-    
-    var searchQuery by remember { mutableStateOf("") }
-    var hasPermission by remember { 
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) 
-    }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasPermission = it }
+        val context = LocalContext.current
+        val focusManager = LocalFocusManager.current
+        val scope = rememberCoroutineScope()
+        val venues by viewModel.venues.collectAsState()
+        
+        val cameraPositionState = rememberCameraPositionState {
+            position = CameraPosition.fromLatLngZoom(LatLng(40.4168, -3.7038), 14f)
+        }
+        
+        var searchQuery by remember { mutableStateOf("") }
+        var hasPermission by remember { 
+            mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) 
+        }
+        val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasPermission = it }
 
-    LaunchedEffect(Unit) {
-        if (!hasPermission) launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-    }
+        LaunchedEffect(Unit) {
+            if (!hasPermission) launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
 
-    val filteredVenues = if (searchQuery.isBlank()) venues 
-                         else venues.filter { it.name.contains(searchQuery, ignoreCase = true) || it.category.contains(searchQuery, ignoreCase = true) }
+        val filteredVenues = if (searchQuery.isBlank()) venues 
+                             else venues.filter { it.name.contains(searchQuery, ignoreCase = true) || it.category.contains(searchQuery, ignoreCase = true) }
 
-    val sharedPrefs = context.getSharedPreferences("Settings", android.content.Context.MODE_PRIVATE)
-    val isDarkMap = sharedPrefs.getBoolean("dark_map", true)
-    
-    val mapStyleJson = if (isDarkMap) {
-        """[{"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#ffffff"}]},{"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#000000"},{"lightness":13}]},{"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#144b53"},{"lightness":14},{"weight":1.4}]},{"featureType":"landscape","elementType":"all","stylers":[{"color":"#08304b"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#0c4152"},{"lightness":5}]},{"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#0b434f"},{"lightness":25}]},{"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#0b3d51"},{"lightness":16}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"}]},{"featureType":"transit","elementType":"all","stylers":[{"color":"#146474"}]},{"featureType":"water","elementType":"all","stylers":[{"color":"#021019"}]}]"""
-    } else null
+        val sharedPrefs = context.getSharedPreferences("Settings", android.content.Context.MODE_PRIVATE)
+        val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+        
+        var isDarkMap by remember { mutableStateOf(sharedPrefs.getBoolean("dark_map", systemDark)) }
+        
+        DisposableEffect(sharedPrefs) {
+            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+                if (key == "dark_map") {
+                    isDarkMap = prefs.getBoolean("dark_map", systemDark)
+                }
+            }
+            sharedPrefs.registerOnSharedPreferenceChangeListener(listener)
+            onDispose {
+                sharedPrefs.unregisterOnSharedPreferenceChangeListener(listener)
+            }
+        }
+        
+        val mapStyleJson = if (isDarkMap) {
+            """[{"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#ffffff"}]},{"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#000000"},{"lightness":13}]},{"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#144b53"},{"lightness":14},{"weight":1.4}]},{"featureType":"landscape","elementType":"all","stylers":[{"color":"#08304b"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#0c4152"},{"lightness":5}]},{"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#0b434f"},{"lightness":25}]},{"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#0b3d51"},{"lightness":16}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"}]},{"featureType":"transit","elementType":"all","stylers":[{"color":"#146474"}]},{"featureType":"water","elementType":"all","stylers":[{"color":"#021019"}]}]"""
+        } else null
 
     Box(modifier = Modifier.fillMaxSize()) {
         GoogleMap(
@@ -208,6 +226,23 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
                         }
                         true 
                     }
+                )
+            }
+        }
+
+        if (!hasPermission) {
+            Card(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 64.dp, start = 16.dp, end = 16.dp)
+                    .fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = NeonPink.copy(alpha = 0.9f))
+            ) {
+                Text(
+                    text = "Habilita la localización para disfrutar de las recomendaciones cercanas.",
+                    color = Color.White,
+                    modifier = Modifier.padding(16.dp),
+                    fontSize = 14.sp
                 )
             }
         }

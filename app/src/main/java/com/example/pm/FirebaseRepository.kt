@@ -7,6 +7,7 @@ import android.net.Uri
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.storage.FirebaseStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -69,6 +70,42 @@ class FirebaseRepository @Inject constructor(
         return@withContext ref.downloadUrl.await().toString()
     }
 
+    private suspend fun loadBitmapFromUri(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+                android.graphics.ImageDecoder.decodeBitmap(source)
+            } else {
+                @Suppress("DEPRECATION")
+                android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun cropTo9x16(bitmap: Bitmap): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        val targetRatio = 9f / 16f
+        val currentRatio = width.toFloat() / height.toFloat()
+
+        var newWidth = width
+        var newHeight = height
+        var startX = 0
+        var startY = 0
+
+        if (currentRatio > targetRatio) {
+            newWidth = (height * targetRatio).toInt()
+            startX = (width - newWidth) / 2
+        } else if (currentRatio < targetRatio) {
+            newHeight = (width / targetRatio).toInt()
+            startY = (height - newHeight) / 2
+        }
+
+        return Bitmap.createBitmap(bitmap, startX, startY, newWidth, newHeight)
+    }
+
     private suspend fun generateVideoThumbnail(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
         val retriever = MediaMetadataRetriever()
         try {
@@ -92,9 +129,16 @@ class FirebaseRepository @Inject constructor(
         val videoUrl = if (isVideo) uploadFile(uri, "stories", true) else null
         val imageUrl = if (isVideo) {
             val bitmap = generateVideoThumbnail(uri)
-            if (bitmap != null) uploadBitmap(bitmap, "stories_thumbnails") else ""
+            if (bitmap != null) {
+                uploadBitmap(bitmap, "stories_thumbnails")
+            } else ""
         } else {
-            uploadFile(uri, "stories", false)
+            val bitmap = loadBitmapFromUri(uri)
+            if (bitmap != null) {
+                uploadBitmap(bitmap, "stories")
+            } else {
+                uploadFile(uri, "stories", false)
+            }
         }
 
         val story = Story(
@@ -140,18 +184,19 @@ class FirebaseRepository @Inject constructor(
         val query = if (allUids.size <= 10) {
             firestore.collection("stories")
                 .whereIn("userId", allUids)
-                .orderBy("expiresAt", Query.Direction.DESCENDING)
         } else {
             firestore.collection("stories")
-                .orderBy("expiresAt", Query.Direction.DESCENDING)
-                .limit(100)
         }
 
         val listener = query.addSnapshotListener { snapshot, error ->
-            if (error != null) return@addSnapshotListener
+            if (error != null) {
+                android.util.Log.e("FirebaseRepository", "Error getting stories", error)
+                return@addSnapshotListener
+            }
             val currentTime = Timestamp.now()
             var stories = snapshot?.toObjects(Story::class.java)
-                ?.filter { it.expiresAt > currentTime } ?: emptyList()
+                ?.filter { it.expiresAt > currentTime }
+                ?.sortedByDescending { it.expiresAt } ?: emptyList()
             
             if (allUids.size > 10) {
                 stories = stories.filter { allUids.contains(it.userId) }
@@ -165,12 +210,15 @@ class FirebaseRepository @Inject constructor(
     fun getStoriesByUser(userId: String): Flow<List<Story>> = callbackFlow {
         val listener = firestore.collection("stories")
             .whereEqualTo("userId", userId)
-            .orderBy("expiresAt", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
+                if (error != null) {
+                    android.util.Log.e("FirebaseRepository", "Error getting user stories", error)
+                    return@addSnapshotListener
+                }
                 val currentTime = Timestamp.now()
                 val stories = snapshot?.toObjects(Story::class.java)
-                    ?.filter { it.expiresAt > currentTime } ?: emptyList()
+                    ?.filter { it.expiresAt > currentTime }
+                    ?.sortedBy { it.expiresAt } ?: emptyList()
                 trySend(stories)
             }
         awaitClose { listener.remove() }
@@ -282,24 +330,28 @@ class FirebaseRepository @Inject constructor(
         val user = getCurrentUser() ?: return
         val postRef = firestore.collection("posts").document(postId)
         
-        firestore.runTransaction { transaction ->
-            val snapshot = transaction.get(postRef)
-            val post = snapshot.toObject(Post::class.java) ?: return@runTransaction
-            val newLikedBy = post.likedBy.toMutableList()
-            if (newLikedBy.contains(uid)) newLikedBy.remove(uid) else newLikedBy.add(uid)
-            transaction.update(postRef, "likedBy", newLikedBy)
-            transaction.update(postRef, "likesCount", newLikedBy.size)
-        }.await()
-
-        val postDoc = postRef.get().await().toObject(Post::class.java)
-        if (postDoc != null && postDoc.likedBy.contains(uid) && postDoc.userId != uid) {
-            sendNotification(ActivityNotification(
-                fromUserId = uid,
-                fromUsername = user.username,
-                toUserId = postDoc.userId,
-                type = "like",
-                targetId = postId
-            ))
+        val postDoc = postRef.get().await().toObject(Post::class.java) ?: return
+        
+        if (postDoc.likedBy.contains(uid)) {
+            postRef.update(
+                "likedBy", FieldValue.arrayRemove(uid),
+                "likesCount", FieldValue.increment(-1)
+            ).await()
+        } else {
+            postRef.update(
+                "likedBy", FieldValue.arrayUnion(uid),
+                "likesCount", FieldValue.increment(1)
+            ).await()
+            
+            if (postDoc.userId != uid) {
+                sendNotification(ActivityNotification(
+                    fromUserId = uid,
+                    fromUsername = user.username,
+                    toUserId = postDoc.userId,
+                    type = "like",
+                    targetId = postId
+                ))
+            }
         }
     }
 
