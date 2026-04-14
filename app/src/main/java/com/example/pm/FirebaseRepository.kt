@@ -5,21 +5,45 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class FirebaseRepository {
-    private val firestore = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
-    private val storage = FirebaseStorage.getInstance()
+@Singleton
+class FirebaseRepository @Inject constructor(
+    private val auth: FirebaseAuth,
+    private val firestore: FirebaseFirestore,
+    private val storage: FirebaseStorage
+) {
+
+    fun getCurrentUserFlow(): Flow<User?> = callbackFlow {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            trySend(null)
+            close()
+            return@callbackFlow
+        }
+        val listener = firestore.collection("users").document(uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                trySend(snapshot?.toObject(User::class.java))
+            }
+        awaitClose { listener.remove() }
+    }
 
     suspend fun getCurrentUser(): User? {
         val uid = auth.currentUser?.uid ?: return null
         return firestore.collection("users").document(uid).get().await().toObject(User::class.java)
+    }
+
+    suspend fun getOtherUser(userId: String): User? {
+        return firestore.collection("users").document(userId).get().await().toObject(User::class.java)
     }
 
     suspend fun uploadImage(uri: Uri, path: String): String {
@@ -47,12 +71,6 @@ class FirebaseRepository {
         firestore.collection("stories").add(story).await()
     }
 
-    suspend fun getVenues(): List<Venue> {
-        // Se tiene en cuenta el espacio en blanco si fuera necesario, 
-        // aunque en el query manual de MainActivity ya se gestiona.
-        return firestore.collection(" venues").get().await().toObjects(Venue::class.java)
-    }
-
     suspend fun toggleAttendance(venueId: String) {
         val uid = auth.currentUser?.uid ?: return
         val attendanceRef = firestore.collection("attendances")
@@ -73,17 +91,6 @@ class FirebaseRepository {
         }
     }
 
-    fun getAttendanceForVenue(venueId: String): Flow<List<Attendance>> = callbackFlow {
-        val listener = firestore.collection("attendances")
-            .whereEqualTo("venueId", venueId)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
-                val attendances = snapshot?.toObjects(Attendance::class.java) ?: emptyList()
-                trySend(attendances)
-            }
-        awaitClose { listener.remove() }
-    }
-
     fun getStories(followingUids: List<String>): Flow<List<Story>> = callbackFlow {
         val uid = auth.currentUser?.uid ?: ""
         val allUids = (followingUids + uid).filter { it.isNotEmpty() }
@@ -93,7 +100,9 @@ class FirebaseRepository {
             return@callbackFlow
         }
 
-        // Firestore 'whereIn' supports up to 10 elements.
+        // Si hay más de 10 seguidos, Firestore no permite 'whereIn'. 
+        // En una app real, haríamos queries por lotes o usaríamos otra estructura.
+        // Para que sea funcional y seguro, filtraremos client-side si superamos el límite.
         val query = if (allUids.size <= 10) {
             firestore.collection("stories")
                 .whereIn("userId", allUids)
@@ -101,13 +110,20 @@ class FirebaseRepository {
         } else {
             firestore.collection("stories")
                 .orderBy("expiresAt", Query.Direction.DESCENDING)
+                .limit(100) // Evitar traer demasiados datos
         }
 
         val listener = query.addSnapshotListener { snapshot, error ->
             if (error != null) return@addSnapshotListener
             val currentTime = Timestamp.now()
-            val stories = snapshot?.toObjects(Story::class.java)
+            var stories = snapshot?.toObjects(Story::class.java)
                 ?.filter { it.expiresAt > currentTime } ?: emptyList()
+            
+            // Si superamos los 10, filtramos manualmente por seguridad y precisión
+            if (allUids.size > 10) {
+                stories = stories.filter { allUids.contains(it.userId) }
+            }
+            
             trySend(stories)
         }
         awaitClose { listener.remove() }
@@ -182,8 +198,17 @@ class FirebaseRepository {
         }
     }
 
-    suspend fun getOtherUser(otherId: String): User? {
-        return firestore.collection("users").document(otherId).get().await().toObject(User::class.java)
+    fun setTyping(chatId: String, isTyping: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+        firestore.collection("chats").document(chatId).update("typingUsers.$uid", isTyping)
+    }
+
+    fun getChatRoom(chatId: String): Flow<ChatRoom?> = callbackFlow {
+        val listener = firestore.collection("chats").document(chatId)
+            .addSnapshotListener { snapshot, _ ->
+                trySend(snapshot?.toObject(ChatRoom::class.java))
+            }
+        awaitClose { listener.remove() }
     }
 
     suspend fun sendNotification(notification: ActivityNotification) {
@@ -198,6 +223,7 @@ class FirebaseRepository {
         val post = Post(
             userId = user.uid,
             username = user.username,
+            userPhotoUrl = user.photoUrl,
             imageUrl = imageUrl,
             caption = caption,
             timestamp = Timestamp.now()

@@ -51,7 +51,7 @@ data class Story(
     @DocumentId val id: String = "",
     val userId: String = "",
     val username: String = "", 
-    val userPhotoUrl: String = "", // Añadido para mostrar perfil en los círculos
+    val userPhotoUrl: String = "", 
     val imageUrl: String = "",
     val expiresAt: Timestamp = Timestamp.now()
 )
@@ -63,7 +63,8 @@ data class ChatRoom(
     @DocumentId val id: String = "",
     val participants: List<String> = emptyList(),
     val lastMessage: String = "",
-    val lastTimestamp: Timestamp = Timestamp.now()
+    val lastTimestamp: Timestamp = Timestamp.now(),
+    val typingUsers: Map<String, Boolean> = emptyMap()
 )
 
 /**
@@ -101,6 +102,7 @@ data class Post(
     @DocumentId val id: String = "",
     val userId: String = "",
     val username: String = "",
+    val userPhotoUrl: String = "",
     val imageUrl: String = "",
     val caption: String = "",
     val timestamp: Timestamp = Timestamp.now(),
