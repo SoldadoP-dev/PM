@@ -42,9 +42,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
         )
 
-        val channelId = "default_channel"
+        val channelId = "channel_pm_high_priority"
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(messageBody)
             .setAutoCancel(true)
@@ -58,9 +58,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "Notificaciones Generales",
+                "Notificaciones Importantes",
                 NotificationManager.IMPORTANCE_HIGH
             )
+            channel.enableVibration(true)
             notificationManager.createNotificationChannel(channel)
         }
 

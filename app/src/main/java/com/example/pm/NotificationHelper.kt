@@ -9,7 +9,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 
 object NotificationHelper {
-    private const val CHANNEL_ID = "default_channel"
+    private const val CHANNEL_ID = "channel_pm_high_priority"
 
     fun showNotification(
         context: Context,
@@ -25,9 +25,10 @@ object NotificationHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Notificaciones de PM",
+                "Notificaciones Importantes",
                 NotificationManager.IMPORTANCE_HIGH
             )
+            channel.enableVibration(true)
             notificationManager.createNotificationChannel(channel)
         }
 
