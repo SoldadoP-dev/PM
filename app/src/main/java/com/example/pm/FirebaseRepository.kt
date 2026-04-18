@@ -243,7 +243,8 @@ class FirebaseRepository @Inject constructor(
             text = text,
             imageUrl = imageUrl,
             videoUrl = videoUrl,
-            timestamp = Timestamp.now()
+            timestamp = Timestamp.now(),
+            isRead = false
         )
         firestore.collection("chats").document(chatId).collection("messages").add(message).await()
         
@@ -267,7 +268,8 @@ class FirebaseRepository @Inject constructor(
                 toUserId = otherId,
                 type = "message",
                 content = lastMsg,
-                targetId = chatId
+                targetId = chatId,
+                isRead = false
             ))
         }
     }
@@ -288,7 +290,13 @@ class FirebaseRepository @Inject constructor(
     suspend fun sendNotification(notification: ActivityNotification) {
         if (notification.toUserId == notification.fromUserId) return
         val ref = firestore.collection("notifications").document()
-        ref.set(notification.copy(id = ref.id, timestamp = Timestamp.now())).await()
+        // FORZAMOS isRead a false explícitamente al guardar en Firebase
+        val finalNotif = notification.copy(
+            id = ref.id, 
+            timestamp = Timestamp.now(),
+            isRead = false
+        )
+        ref.set(finalNotif).await()
     }
 
     suspend fun createPost(uri: Uri, caption: String, isVideo: Boolean = false) {
@@ -349,7 +357,8 @@ class FirebaseRepository @Inject constructor(
                     fromUsername = user.username,
                     toUserId = postDoc.userId,
                     type = "like",
-                    targetId = postId
+                    targetId = postId,
+                    isRead = false
                 ))
             }
         }
@@ -374,7 +383,8 @@ class FirebaseRepository @Inject constructor(
                 toUserId = postDoc.userId,
                 type = "comment",
                 content = text,
-                targetId = postId
+                targetId = postId,
+                isRead = false
             ))
         }
     }

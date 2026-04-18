@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.pm.Post
 import com.example.pm.R
 import com.example.pm.ui.components.ProfileStat
@@ -46,7 +47,6 @@ fun ProfileScreen(
     val user by viewModel.user.collectAsState()
     val posts by viewModel.posts.collectAsState()
     val context = LocalContext.current
-    var showMediaPicker by remember { mutableStateOf(false) }
 
     val profileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let { viewModel.updateProfilePicture(it) }
@@ -61,81 +61,90 @@ fun ProfileScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
-        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(contentAlignment = Alignment.BottomEnd) {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .border(3.dp, InstaGradient, CircleShape)
-                        .padding(5.dp)
-                        .background(Color.DarkGray, CircleShape)
-                        .clickable { profileLauncher.launch("image/*") }, 
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (!user?.photoUrl.isNullOrEmpty()) {
+        if (user == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = NeonPurple)
+            }
+        } else {
+            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(contentAlignment = Alignment.BottomEnd) {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .border(3.dp, InstaGradient, CircleShape)
+                            .padding(5.dp)
+                            .background(Color.DarkGray, CircleShape)
+                            .clickable { profileLauncher.launch("image/*") }, 
+                        contentAlignment = Alignment.Center
+                    ) {
                         AsyncImage(
-                            model = user?.photoUrl,
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(user?.photoUrl)
+                                .crossfade(true)
+                                .build(),
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize().clip(CircleShape),
-                            contentScale = ContentScale.Crop
+                            contentScale = ContentScale.Crop,
+                            error = null // Se podría poner un placeholder aquí
                         )
-                    } else {
-                        Text(user?.username?.take(1)?.uppercase() ?: "?", fontSize = 40.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        if (user?.photoUrl.isNullOrEmpty()) {
+                            Text(user?.username?.take(1)?.uppercase() ?: "?", fontSize = 40.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(NeonPurple, CircleShape)
+                            .border(2.dp, DeepSpace, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp), tint = Color.Black)
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .background(NeonPurple, CircleShape)
-                        .border(2.dp, DeepSpace, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp), tint = Color.Black)
-                }
-            }
-            
-            Text(user?.username ?: "...", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(top = 12.dp))
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                ProfileStat(posts.size.toString(), stringResource(R.string.posts)) {}
-                ProfileStat(user?.followersCount?.toString() ?: "0", stringResource(R.string.followers)) { 
-                    rootNavController.navigate("userList/followers/${user?.uid}") 
-                }
-                ProfileStat(user?.followingCount?.toString() ?: "0", stringResource(R.string.following)) { 
-                    rootNavController.navigate("userList/following/${user?.uid}") 
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { mediaLauncher.launch("*/*") },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
-                ) {
-                    Icon(Icons.Default.Add, null, tint = Color.Black)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.new_photo), color = Color.Black, fontWeight = FontWeight.Bold)
-                }
                 
-                IconButton(
-                    onClick = { 
-                        viewModel.logout()
-                        rootNavController.navigate("login") { popUpTo(0) } 
-                    },
-                    modifier = Modifier.background(CardGray, RoundedCornerShape(12.dp))
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, null, tint = NeonPink)
+                Text(user?.username ?: "...", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(top = 12.dp))
+                
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    ProfileStat(posts.size.toString(), stringResource(R.string.posts)) {}
+                    ProfileStat(user?.followersCount?.toString() ?: "0", stringResource(R.string.followers)) { 
+                        rootNavController.navigate("userList/followers/${user?.uid}") 
+                    }
+                    ProfileStat(user?.followingCount?.toString() ?: "0", stringResource(R.string.following)) { 
+                        rootNavController.navigate("userList/following/${user?.uid}") 
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { mediaLauncher.launch("*/*") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
+                    ) {
+                        Icon(Icons.Default.Add, null, tint = Color.Black)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.new_photo), color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    IconButton(
+                        onClick = { 
+                            viewModel.logout()
+                            rootNavController.navigate("login") { popUpTo(0) } 
+                        },
+                        modifier = Modifier.background(CardGray, RoundedCornerShape(12.dp))
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Logout, null, tint = NeonPink)
+                    }
                 }
             }
-        }
 
-        PostGrid(posts) { post ->
-            rootNavController.navigate("postDetail/${post.id}")
+            PostGrid(posts) { post ->
+                rootNavController.navigate("postDetail/${post.id}")
+            }
         }
     }
 }
@@ -149,10 +158,13 @@ fun PostGrid(posts: List<Post>, onPostClick: (Post) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(1.dp),
         verticalArrangement = Arrangement.spacedBy(1.dp)
     ) {
-        items(posts) { post ->
+        items(posts, key = { it.id }) { post ->
             Box(modifier = Modifier.aspectRatio(1f).clickable { onPostClick(post) }) {
                 AsyncImage(
-                    model = post.imageUrl ?: post.videoUrl, // Muestra thumbnail si es video (Coil maneja thumbnails de video básicos)
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(post.imageUrl ?: post.videoUrl)
+                        .crossfade(true)
+                        .build(),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

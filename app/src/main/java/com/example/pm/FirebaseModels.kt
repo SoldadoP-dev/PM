@@ -93,7 +93,7 @@ data class ActivityNotification(
     val content: String = "", 
     val targetId: String = "", 
     val timestamp: Timestamp = Timestamp.now(),
-    val isRead: Boolean = false
+    @get:PropertyName("isRead") @set:PropertyName("isRead") var isRead: Boolean = false
 )
 
 /**

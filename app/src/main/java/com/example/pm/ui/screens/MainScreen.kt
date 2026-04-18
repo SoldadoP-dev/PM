@@ -1,6 +1,7 @@
 package com.example.pm.ui.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -27,6 +28,7 @@ import com.example.pm.R
 import com.example.pm.Venue
 import com.example.pm.ui.components.BottomNavigationBar
 import com.example.pm.ui.theme.CardGray
+import com.example.pm.ui.theme.DeepSpace
 import com.example.pm.ui.theme.NeonPink
 import com.example.pm.ui.theme.NeonPurple
 import com.example.pm.ui.viewmodels.MainViewModel
@@ -40,11 +42,11 @@ fun MainScreen(
 ) {
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState()
     var selectedVenue by remember { mutableStateOf<Venue?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
     
     val unreadNotifications by viewModel.unreadNotificationsCount.collectAsState()
+    val hasUnread = unreadNotifications > 0
 
     Scaffold(
         topBar = {
@@ -66,20 +68,25 @@ fun MainScreen(
                             Icon(Icons.Default.Settings, null, tint = Color.White)
                         }
                     }
+                    
+                    // ICONO DE NOTIFICACIONES (CORAZÓN)
                     IconButton(onClick = { rootNavController.navigate("notifications") }) {
                         BadgedBox(
                             badge = {
-                                if (unreadNotifications > 0) {
-                                    Badge(containerColor = NeonPink) {
-                                        Text(unreadNotifications.toString(), color = Color.White)
-                                    }
+                                if (hasUnread) {
+                                    // Círculo rojo pequeño y elegante
+                                    Badge(
+                                        containerColor = NeonPink,
+                                        modifier = Modifier.size(8.dp).offset(x = (-4).dp, y = 4.dp)
+                                    )
                                 }
                             }
                         ) {
                             Icon(
-                                if (unreadNotifications > 0) Icons.Default.Favorite else Icons.Default.FavoriteBorder, 
-                                null, 
-                                tint = if (unreadNotifications > 0) NeonPink else Color.White
+                                imageVector = if (hasUnread) Icons.Default.Favorite else Icons.Default.FavoriteBorder, 
+                                contentDescription = "Notifications", 
+                                tint = if (hasUnread) NeonPink else Color.White,
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                     }
@@ -92,37 +99,41 @@ fun MainScreen(
                 selectedIndex = pagerState.currentPage,
                 onItemSelected = { index ->
                     scope.launch { 
-                        pagerState.animateScrollToPage(index) 
+                        pagerState.scrollToPage(index)
                     }
                 }
             ) 
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
+        Box(modifier = Modifier.padding(innerPadding).background(DeepSpace)) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                beyondViewportPageCount = 1,
-                userScrollEnabled = pagerState.currentPage != 0 // No permitir scroll desde el mapa para no interferir con Google Maps
+                beyondViewportPageCount = 0,
+                userScrollEnabled = pagerState.currentPage != 0
             ) { page ->
-                when (page) {
-                    0 -> HomeScreen(
-                        onVenueClick = { venue ->
-                            selectedVenue = venue
-                            showBottomSheet = true
-                        },
-                        rootNavController = rootNavController
-                    )
-                    1 -> ExploreScreen(rootNavController)
-                    2 -> MessagesListScreen(rootNavController)
-                    3 -> ProfileScreen(rootNavController)
+                val isVisible = Math.abs(pagerState.currentPage - page) <= 1
+                if (isVisible) {
+                    when (page) {
+                        0 -> HomeScreen(
+                            onVenueClick = { venue ->
+                                selectedVenue = venue
+                                showBottomSheet = true
+                            },
+                            rootNavController = rootNavController
+                        )
+                        1 -> ExploreScreen(rootNavController)
+                        2 -> MessagesListScreen(rootNavController)
+                        3 -> ProfileScreen(rootNavController)
+                    }
+                } else {
+                    Box(modifier = Modifier.fillMaxSize())
                 }
             }
             
             if (showBottomSheet && selectedVenue != null) {
                 ModalBottomSheet(
                     onDismissRequest = { showBottomSheet = false },
-                    sheetState = sheetState,
                     containerColor = CardGray,
                     contentColor = Color.White,
                     shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)

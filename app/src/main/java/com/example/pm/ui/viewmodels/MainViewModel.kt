@@ -40,11 +40,24 @@ class MainViewModel @Inject constructor(
 
     private fun observeNotifications() {
         val uid = auth.currentUser?.uid ?: return
+        
+        // Listener en tiempo real más flexible: buscamos todas las notificaciones
+        // y filtramos localmente para garantizar que nada se escape
         firestore.collection("notifications")
             .whereEqualTo("toUserId", uid)
-            .whereEqualTo("isRead", false)
-            .addSnapshotListener { snapshot, _ ->
-                _unreadNotificationsCount.value = snapshot?.size() ?: 0
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    android.util.Log.e("MainViewModel", "Error observing notifications", error)
+                    return@addSnapshotListener
+                }
+                
+                // Contamos solo las que NO tienen isRead: true
+                val unreadCount = snapshot?.documents?.count { doc ->
+                    val isRead = doc.getBoolean("isRead") ?: false
+                    !isRead
+                } ?: 0
+                
+                _unreadNotificationsCount.value = unreadCount
             }
     }
 

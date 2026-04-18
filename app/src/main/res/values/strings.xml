@@ -22,12 +22,14 @@
     <string name="activity">Actividad</string>
     <string name="read_all">Leer todas</string>
     <string name="accept">Aceptar</string>
+    <string name="accepted">Aceptado</string>
     <string name="posts">Posts</string>
     <string name="followers">Seguidores</string>
     <string name="following">Siguiendo</string>
     <string name="new_photo">Nueva Foto</string>
     <string name="message">Mensaje</string>
     <string name="follow">Seguir</string>
+    <string name="requested">Solicitado</string>
     <string name="pending">Pendiente</string>
     <string name="settings">Ajustes</string>
     <string name="dark_map">Mapa Oscuro</string>

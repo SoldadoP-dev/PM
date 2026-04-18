@@ -1,5 +1,6 @@
 package com.example.pm.ui.screens
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,9 +14,8 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,7 +39,8 @@ fun NotificationsScreen(
     navController: NavHostController,
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
-    val notifications by viewModel.notifications.collectAsState()
+    val requests by viewModel.followRequests.collectAsState()
+    val generalNotifs by viewModel.generalNotifications.collectAsState()
 
     Scaffold(
         topBar = {
@@ -59,27 +60,75 @@ fun NotificationsScreen(
             )
         }
     ) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding)) {
-            items(notifications) { notif ->
-                NotificationItem(
-                    notif = notif,
-                    onAccept = { viewModel.acceptFollowRequest(notif) },
-                    onClick = {
-                        viewModel.markAsRead(notif.id)
-                        when(notif.type) {
-                            "like", "comment" -> navController.navigate("postDetail/${notif.targetId}")
-                            "message" -> navController.navigate("chat/${notif.targetId}/${notif.fromUsername}/${notif.fromUserId}")
-                            "follow_request" -> navController.navigate("otherProfile/${notif.fromUserId}")
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(DeepSpace)
+                .padding(padding)
+        ) {
+            // SECCIÓN DE SOLICITUDES
+            if (requests.isNotEmpty()) {
+                item {
+                    SectionHeader("Solicitudes de seguimiento")
+                }
+                items(requests, key = { it.id }) { notif ->
+                    NotificationItem(
+                        notif = notif,
+                        onAccept = { viewModel.acceptFollowRequest(notif) },
+                        onClick = {
+                            viewModel.markAsRead(notif.id)
+                            navController.navigate("otherProfile/${notif.fromUserId}")
                         }
+                    )
+                }
+                item { Spacer(modifier = Modifier.height(16.dp)) }
+            }
+
+            // SECCIÓN DE ACTIVIDAD GENERAL
+            item {
+                SectionHeader("Actividad reciente")
+            }
+            
+            if (generalNotifs.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        Text("No hay actividad nueva", color = Color.Gray, fontSize = 14.sp)
                     }
-                )
+                }
+            } else {
+                items(generalNotifs, key = { it.id }) { notif ->
+                    NotificationItem(
+                        notif = notif,
+                        onAccept = {},
+                        onClick = {
+                            viewModel.markAsRead(notif.id)
+                            when(notif.type) {
+                                "like", "comment" -> navController.navigate("postDetail/${notif.targetId}")
+                                "message" -> navController.navigate("chat/${notif.targetId}/${notif.fromUsername}/${notif.fromUserId}")
+                            }
+                        }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
+fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        color = Color.White,
+        fontWeight = FontWeight.Bold,
+        fontSize = 16.sp,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+    )
+}
+
+@Composable
 fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick: () -> Unit) {
+    var isAcceptedLocal by rememberSaveable(notif.id) { mutableStateOf(false) }
+    
     ListItem(
         modifier = Modifier
             .background(if (!notif.isRead) NeonPurple.copy(alpha = 0.05f) else Color.Transparent)
@@ -113,14 +162,28 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (notif.type == "follow_request") {
+                    val currentlyAccepted = isAcceptedLocal || notif.isRead
+                    
                     Button(
-                        onClick = onAccept, 
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonPurple), 
+                        onClick = {
+                            isAcceptedLocal = true
+                            onAccept()
+                        }, 
+                        enabled = !currentlyAccepted,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (currentlyAccepted) Color.DarkGray else NeonPurple,
+                            disabledContainerColor = Color.DarkGray,
+                            disabledContentColor = Color.White
+                        ), 
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(32.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                        modifier = Modifier.height(32.dp).widthIn(min = 84.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                     ) {
-                        Text(stringResource(R.string.accept), color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(
+                            text = if (currentlyAccepted) stringResource(R.string.accepted) else stringResource(R.string.accept),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
                     }
                 }
                 if (!notif.isRead) {

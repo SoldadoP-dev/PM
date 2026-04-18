@@ -9,7 +9,10 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -22,7 +25,16 @@ class NotificationsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _notifications = MutableStateFlow<List<ActivityNotification>>(emptyList())
-    val notifications: StateFlow<List<ActivityNotification>> = _notifications
+    
+    // Notificaciones de solicitudes de seguimiento
+    val followRequests: StateFlow<List<ActivityNotification>> = _notifications.map { list ->
+        list.filter { it.type == "follow_request" }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // El resto de notificaciones (likes, comentarios, mensajes)
+    val generalNotifications: StateFlow<List<ActivityNotification>> = _notifications.map { list ->
+        list.filter { it.type != "follow_request" }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     init {
         loadNotifications()
@@ -34,19 +46,30 @@ class NotificationsViewModel @Inject constructor(
             .whereEqualTo("toUserId", currentUserId)
             .addSnapshotListener { snapshot, _ ->
                 val list = snapshot?.toObjects(ActivityNotification::class.java) ?: emptyList()
-                _notifications.value = list.sortedByDescending { it.timestamp }.take(50)
+                _notifications.value = list.sortedByDescending { it.timestamp }
             }
     }
 
     fun markAllAsRead() {
         val currentUserId = auth.currentUser?.uid ?: return
         viewModelScope.launch {
-            val unreadDocs = firestore.collection("notifications")
-                .whereEqualTo("toUserId", currentUserId)
-                .whereEqualTo("isRead", false)
-                .get().await()
-            for (doc in unreadDocs.documents) {
-                doc.reference.update("isRead", true)
+            try {
+                val unreadDocs = firestore.collection("notifications")
+                    .whereEqualTo("toUserId", currentUserId)
+                    .get().await()
+                
+                val batch = firestore.batch()
+                var count = 0
+                for (doc in unreadDocs.documents) {
+                    val isRead = doc.getBoolean("isRead") ?: false
+                    if (!isRead) {
+                        batch.update(doc.reference, "isRead", true)
+                        count++
+                    }
+                }
+                if (count > 0) batch.commit().await()
+            } catch (e: Exception) {
+                android.util.Log.e("NotificationsViewModel", "Error marking all as read", e)
             }
         }
     }
