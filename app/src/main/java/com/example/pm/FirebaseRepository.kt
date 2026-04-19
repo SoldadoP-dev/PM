@@ -370,6 +370,7 @@ class FirebaseRepository @Inject constructor(
             postId = postId,
             userId = user.uid,
             username = user.username,
+            userPhotoUrl = user.photoUrl,
             text = text,
             timestamp = Timestamp.now()
         )

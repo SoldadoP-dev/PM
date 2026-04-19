@@ -32,7 +32,9 @@ class MessagesViewModel @Inject constructor(
         firestore.collection("chats")
             .whereArrayContains("participants", currentUserId)
             .addSnapshotListener { snapshot, _ ->
-                _chats.value = snapshot?.toObjects(ChatRoom::class.java) ?: emptyList()
+                val chatList = snapshot?.toObjects(ChatRoom::class.java) ?: emptyList()
+                // Ordenar por el timestamp más reciente del último mensaje
+                _chats.value = chatList.sortedByDescending { it.lastTimestamp }
             }
     }
 

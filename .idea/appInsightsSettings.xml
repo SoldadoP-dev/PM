@@ -9,9 +9,9 @@
               <option name="connection">
                 <ConnectionSetting>
                   <option name="appId" value="com.example.pm" />
-                  <option name="mobileSdkAppId" value="1:172905142467:android:56881fab18036bda022a76" />
-                  <option name="projectId" value="rsapp-15c9e" />
-                  <option name="projectNumber" value="172905142467" />
+                  <option name="mobileSdkAppId" value="1:976493563758:android:c86f69320a150d97637b7f" />
+                  <option name="projectId" value="pmapp-663d0" />
+                  <option name="projectNumber" value="976493563758" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

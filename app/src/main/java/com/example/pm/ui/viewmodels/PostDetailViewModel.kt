@@ -40,6 +40,10 @@ class PostDetailViewModel @Inject constructor(
         }
     }
 
+    suspend fun getUserPhoto(userId: String): String? {
+        return repository.getOtherUser(userId)?.photoUrl
+    }
+
     fun toggleLike(postId: String) {
         val currentPost = _post.value ?: return
         val currentLikedBy = currentPost.likedBy.toMutableList()

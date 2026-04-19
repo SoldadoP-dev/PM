@@ -120,6 +120,7 @@ data class Comment(
     val postId: String = "",
     val userId: String = "",
     val username: String = "",
+    val userPhotoUrl: String = "",
     val text: String = "",
     val timestamp: Timestamp = Timestamp.now()
 )

@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import com.example.pm.Comment
 import com.example.pm.ui.components.UserAvatar
 import com.example.pm.ui.components.VideoPlayer
 import com.example.pm.ui.theme.CardGray
@@ -89,9 +90,16 @@ fun PostDetailScreen(
         LazyColumn(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding)) {
             item {
                 post?.let { p ->
+                    var authorPhoto by remember { mutableStateOf(p.userPhotoUrl) }
+                    LaunchedEffect(p.userId) {
+                        if (authorPhoto.isEmpty()) {
+                            authorPhoto = viewModel.getUserPhoto(p.userId) ?: ""
+                        }
+                    }
+
                     Column {
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            UserAvatar(null, p.username, 32.dp)
+                            UserAvatar(authorPhoto, p.username, 32.dp)
                             Text(p.username, modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold, color = Color.White)
                         }
                         
@@ -126,13 +134,26 @@ fun PostDetailScreen(
                 }
             }
             items(comments) { comment ->
-                ListItem(
-                    headlineContent = { Text(comment.username, fontWeight = FontWeight.Bold, color = Color.White) },
-                    supportingContent = { Text(comment.text, color = Color.White) },
-                    leadingContent = { UserAvatar(null, comment.username, 32.dp) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                )
+                CommentItem(comment, viewModel)
             }
         }
     }
+}
+
+@Composable
+fun CommentItem(comment: Comment, viewModel: PostDetailViewModel) {
+    var photoUrl by remember { mutableStateOf(comment.userPhotoUrl) }
+    
+    LaunchedEffect(comment.userId) {
+        if (photoUrl.isEmpty()) {
+            photoUrl = viewModel.getUserPhoto(comment.userId) ?: ""
+        }
+    }
+
+    ListItem(
+        headlineContent = { Text(comment.username, fontWeight = FontWeight.Bold, color = Color.White) },
+        supportingContent = { Text(comment.text, color = Color.White) },
+        leadingContent = { UserAvatar(photoUrl, comment.username, 32.dp) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
 }
