@@ -22,7 +22,7 @@ data class User(
 )
 
 /**
- * Representa un local nocturno (discoteca, bar, club).
+ * Representa un local nocturno.
  */
 data class Venue(
     @DocumentId var id: String = "",
@@ -34,18 +34,27 @@ data class Venue(
 )
 
 /**
- * Registra la intención de un usuario de asistir a un local.
+ * Registra la intención de un usuario de asistir con sus etiquetas elegidas.
  */
 data class Attendance(
     @DocumentId val id: String = "",
     val userId: String = "",
     val venueId: String = "",
     val timestamp: Timestamp = Timestamp.now(),
-    val status: String = "going"
+    val status: String = "going",
+    val selectedTags: List<String> = emptyList() // Almacena hasta 3 etiquetas
 )
 
 /**
- * Publicación temporal (Story) que expira a las 24h.
+ * Etiqueta disponible en la base de datos.
+ */
+data class Tag(
+    @DocumentId val id: String = "",
+    val name: String = ""
+)
+
+/**
+ * Publicación temporal (Story).
  */
 data class Story(
     @DocumentId val id: String = "",
@@ -53,23 +62,24 @@ data class Story(
     val username: String = "", 
     val userPhotoUrl: String = "", 
     val imageUrl: String = "",
-    val videoUrl: String? = null, // Soporte para video en stories
+    val videoUrl: String? = null,
     val expiresAt: Timestamp = Timestamp.now()
 )
 
 /**
- * Sala de chat entre dos o más usuarios.
+ * Sala de chat.
  */
 data class ChatRoom(
     @DocumentId val id: String = "",
     val participants: List<String> = emptyList(),
     val lastMessage: String = "",
     val lastTimestamp: Timestamp = Timestamp.now(),
-    val typingUsers: Map<String, Boolean> = emptyMap()
+    val typingUsers: Map<String, Boolean> = emptyMap(),
+    val deletedTimestamps: Map<String, Timestamp> = emptyMap()
 )
 
 /**
- * Mensaje individual dentro de una sala de chat.
+ * Mensaje individual.
  */
 data class Message(
     @DocumentId val id: String = "",
@@ -97,7 +107,7 @@ data class ActivityNotification(
 )
 
 /**
- * Publicación permanente en el perfil.
+ * Publicación permanente.
  */
 data class Post(
     @DocumentId val id: String = "",
@@ -105,7 +115,7 @@ data class Post(
     val username: String = "",
     val userPhotoUrl: String = "",
     val imageUrl: String? = null,
-    val videoUrl: String? = null, // Soporte para video en posts
+    val videoUrl: String? = null,
     val caption: String = "",
     val timestamp: Timestamp = Timestamp.now(),
     val likesCount: Int = 0,
@@ -113,7 +123,7 @@ data class Post(
 )
 
 /**
- * Comentario en una publicación.
+ * Comentario.
  */
 data class Comment(
     @DocumentId val id: String = "",

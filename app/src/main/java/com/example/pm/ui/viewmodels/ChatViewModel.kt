@@ -43,12 +43,25 @@ class ChatViewModel @Inject constructor(
                 _chatRoom.value = room
             }
         }
+
         viewModelScope.launch {
-            repository.getMessages(chatId).collect { msgs ->
-                _messages.value = msgs
+            // Combinamos los mensajes con la info del chat para saber la fecha de borrado
+            combine(
+                repository.getMessages(chatId),
+                repository.getChatRoom(chatId)
+            ) { msgs, room ->
+                val deleteTime = room?.deletedTimestamps?.get(currentUserId)
+                if (deleteTime != null) {
+                    // Solo mostramos mensajes posteriores a cuando borraste el chat
+                    msgs.filter { it.timestamp > deleteTime }
+                } else {
+                    msgs
+                }
+            }.collect { filteredMsgs ->
+                _messages.value = filteredMsgs
                 
-                // Mark messages as read
-                msgs.forEach { msg ->
+                // Marcar como leídos solo los mensajes visibles
+                filteredMsgs.forEach { msg ->
                     if (msg.senderId != currentUserId && !msg.isRead) {
                         firestore.collection("chats").document(chatId)
                             .collection("messages").document(msg.id)

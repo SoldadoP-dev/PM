@@ -5,6 +5,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -90,7 +91,12 @@ fun ChatDetailScreen(
         topBar = {
             TopAppBar(
                 title = { 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            navController.navigate("otherProfile/$otherId")
+                        }
+                    ) {
                         UserAvatar(otherUser?.photoUrl, otherName, 36.dp)
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {

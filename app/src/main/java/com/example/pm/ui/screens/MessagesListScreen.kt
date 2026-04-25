@@ -1,15 +1,14 @@
 package com.example.pm.ui.screens
 
 import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +23,7 @@ import androidx.navigation.NavHostController
 import com.example.pm.ChatRoom
 import com.example.pm.R
 import com.example.pm.ui.components.UserAvatar
+import com.example.pm.ui.theme.CardGray
 import com.example.pm.ui.theme.DeepSpace
 import com.example.pm.ui.theme.NeonPink
 import com.example.pm.ui.theme.NeonPurple
@@ -36,22 +36,55 @@ fun MessagesListScreen(
 ) {
     val chats by viewModel.chats.collectAsState()
     val currentUserId = viewModel.currentUserId
+    var chatToDelete by remember { mutableStateOf<ChatRoom?>(null) }
+
+    if (chatToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { chatToDelete = null },
+            title = { Text("Eliminar chat") },
+            text = { Text("¿Estás seguro de que quieres eliminar este chat? No podrás ver el historial de mensajes, pero la otra persona conservará la conversación.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteChat(chatToDelete!!.id)
+                    chatToDelete = null
+                }) {
+                    Text("Eliminar", color = NeonPink)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { chatToDelete = null }) {
+                    Text("Cancelar", color = Color.Gray)
+                }
+            },
+            containerColor = CardGray,
+            titleContentColor = Color.White,
+            textContentColor = Color.Gray
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize().background(DeepSpace)) {
         Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.messages), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.Edit, null, tint = NeonPurple)
         }
         LazyColumn {
             items(chats) { chat ->
-                ChatItem(chat, currentUserId, rootNavController, viewModel)
+                ChatItem(chat, currentUserId, rootNavController, viewModel) {
+                    chatToDelete = chat
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ChatItem(chat: ChatRoom, currentUserId: String, rootNavController: NavHostController, viewModel: MessagesViewModel) {
+fun ChatItem(
+    chat: ChatRoom, 
+    currentUserId: String, 
+    rootNavController: NavHostController, 
+    viewModel: MessagesViewModel,
+    onLongClick: () -> Unit
+) {
     val otherId = chat.participants.find { it != currentUserId } ?: ""
     var otherName by remember { mutableStateOf("Cargando...") }
     var otherPhoto by remember { mutableStateOf<String?>(null) }
@@ -71,10 +104,13 @@ fun ChatItem(chat: ChatRoom, currentUserId: String, rootNavController: NavHostCo
     }
 
     ListItem(
-        modifier = Modifier.clickable {
-            val encodedName = Uri.encode(otherName)
-            rootNavController.navigate("chat/${chat.id}/$encodedName/$otherId")
-        },
+        modifier = Modifier.combinedClickable(
+            onClick = {
+                val encodedName = Uri.encode(otherName)
+                rootNavController.navigate("chat/${chat.id}/$encodedName/$otherId")
+            },
+            onLongClick = onLongClick
+        ),
         headlineContent = {
             Text(
                 otherName,

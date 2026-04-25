@@ -152,7 +152,7 @@ class FirebaseRepository @Inject constructor(
         firestore.collection("stories").add(story).await()
     }
 
-    suspend fun toggleAttendance(venueId: String) {
+    suspend fun toggleAttendance(venueId: String, selectedTags: List<String> = emptyList()) {
         val uid = auth.currentUser?.uid ?: return
         val attendanceRef = firestore.collection("attendances")
         
@@ -163,7 +163,7 @@ class FirebaseRepository @Inject constructor(
             .await()
 
         if (existing.isEmpty) {
-            val attendance = Attendance(userId = uid, venueId = venueId)
+            val attendance = Attendance(userId = uid, venueId = venueId, selectedTags = selectedTags)
             attendanceRef.add(attendance).await()
         } else {
             for (doc in existing.documents) {
@@ -238,6 +238,11 @@ class FirebaseRepository @Inject constructor(
     suspend fun sendMessage(chatId: String, text: String, imageUrl: String? = null, videoUrl: String? = null) {
         val uid = auth.currentUser?.uid ?: return
         val user = getCurrentUser() ?: return
+        
+        firestore.collection("chats").document(chatId).update(
+            "deletedTimestamps.$uid", FieldValue.delete()
+        ).await()
+
         val message = Message(
             senderId = uid,
             text = text,
@@ -290,7 +295,6 @@ class FirebaseRepository @Inject constructor(
     suspend fun sendNotification(notification: ActivityNotification) {
         if (notification.toUserId == notification.fromUserId) return
         val ref = firestore.collection("notifications").document()
-        // FORZAMOS isRead a false explícitamente al guardar en Firebase
         val finalNotif = notification.copy(
             id = ref.id, 
             timestamp = Timestamp.now(),
@@ -408,6 +412,62 @@ class FirebaseRepository @Inject constructor(
                 if (error != null) return@addSnapshotListener
                 val posts = snapshot?.toObjects(Post::class.java) ?: emptyList()
                 trySend(posts)
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun getPost(postId: String): Post? {
+        return try {
+            firestore.collection("posts").document(postId).get().await().toObject(Post::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun deletePost(postId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        val postDoc = firestore.collection("posts").document(postId).get().await().toObject(Post::class.java) ?: return
+        
+        if (postDoc.userId == uid) {
+            val comments = firestore.collection("posts").document(postId).collection("comments").get().await()
+            for (comment in comments.documents) {
+                comment.reference.delete().await()
+            }
+            try {
+                if (postDoc.imageUrl != null) {
+                    storage.getReferenceFromUrl(postDoc.imageUrl).delete().await()
+                }
+                if (postDoc.videoUrl != null) {
+                    storage.getReferenceFromUrl(postDoc.videoUrl).delete().await()
+                }
+            } catch (e: Exception) {
+            }
+            firestore.collection("posts").document(postId).delete().await()
+        }
+    }
+
+    suspend fun deleteChatForUser(chatId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        firestore.collection("chats").document(chatId).update(
+            "deletedTimestamps.$uid", Timestamp.now()
+        ).await()
+    }
+
+    fun getAllAvailableTags(): Flow<List<Tag>> = callbackFlow {
+        val listener = firestore.collection("tags")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                trySend(snapshot?.toObjects(Tag::class.java) ?: emptyList())
+            }
+        awaitClose { listener.remove() }
+    }
+
+    fun getVenueAttendances(venueId: String): Flow<List<Attendance>> = callbackFlow {
+        val listener = firestore.collection("attendances")
+            .whereEqualTo("venueId", venueId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                trySend(snapshot?.toObjects(Attendance::class.java) ?: emptyList())
             }
         awaitClose { listener.remove() }
     }

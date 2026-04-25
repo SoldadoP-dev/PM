@@ -27,11 +27,8 @@ class PostDetailViewModel @Inject constructor(
 
     fun loadPost(postId: String) {
         viewModelScope.launch {
-            repository.getGlobalPosts().map { posts ->
-                posts.find { it.id == postId }
-            }.collect {
-                _post.value = it
-            }
+            val p = repository.getPost(postId)
+            _post.value = p
         }
         viewModelScope.launch {
             repository.getComments(postId).collect {
@@ -41,7 +38,15 @@ class PostDetailViewModel @Inject constructor(
     }
 
     suspend fun getUserPhoto(userId: String): String? {
+        if (userId.isBlank()) return null
         return repository.getOtherUser(userId)?.photoUrl
+    }
+
+    fun deletePost(postId: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            repository.deletePost(postId)
+            onSuccess()
+        }
     }
 
     fun toggleLike(postId: String) {

@@ -1,6 +1,7 @@
 package com.example.pm.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.pm.ChatRoom
 import com.example.pm.FirebaseRepository
 import com.example.pm.Message
@@ -9,6 +10,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -33,9 +35,20 @@ class MessagesViewModel @Inject constructor(
             .whereArrayContains("participants", currentUserId)
             .addSnapshotListener { snapshot, _ ->
                 val chatList = snapshot?.toObjects(ChatRoom::class.java) ?: emptyList()
+                // Filtrar chats que el usuario actual NO ha borrado o que tienen mensajes nuevos después del borrado
+                val activeChats = chatList.filter { chat ->
+                    val deleteTime = chat.deletedTimestamps[currentUserId]
+                    deleteTime == null || chat.lastTimestamp > deleteTime
+                }
                 // Ordenar por el timestamp más reciente del último mensaje
-                _chats.value = chatList.sortedByDescending { it.lastTimestamp }
+                _chats.value = activeChats.sortedByDescending { it.lastTimestamp }
             }
+    }
+
+    fun deleteChat(chatId: String) {
+        viewModelScope.launch {
+            repository.deleteChatForUser(chatId)
+        }
     }
 
     fun getOtherUserInfo(otherId: String, onResult: (String, String?) -> Unit) {

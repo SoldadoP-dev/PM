@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
@@ -41,9 +42,36 @@ fun PostDetailScreen(
     val comments by viewModel.comments.collectAsState()
     var commentText by remember { mutableStateOf("") }
     val currentUserId = viewModel.currentUserId
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(postId) {
         viewModel.loadPost(postId)
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Eliminar publicación") },
+            text = { Text("¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deletePost(postId) {
+                        showDeleteDialog = false
+                        navController.popBackStack()
+                    }
+                }) {
+                    Text("Eliminar", color = NeonPink)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancelar", color = Color.Gray)
+                }
+            },
+            containerColor = CardGray,
+            titleContentColor = Color.White,
+            textContentColor = Color.Gray
+        )
     }
 
     Scaffold(
@@ -53,6 +81,13 @@ fun PostDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                    }
+                },
+                actions = {
+                    if (post?.userId == currentUserId) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = NeonPink)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
@@ -90,9 +125,9 @@ fun PostDetailScreen(
         LazyColumn(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding)) {
             item {
                 post?.let { p ->
-                    var authorPhoto by remember { mutableStateOf(p.userPhotoUrl) }
-                    LaunchedEffect(p.userId) {
-                        if (authorPhoto.isEmpty()) {
+                    var authorPhoto by remember(p.id) { mutableStateOf(p.userPhotoUrl) }
+                    LaunchedEffect(p.userId, p.userPhotoUrl) {
+                        if (authorPhoto.isBlank()) {
                             authorPhoto = viewModel.getUserPhoto(p.userId) ?: ""
                         }
                     }
@@ -142,11 +177,14 @@ fun PostDetailScreen(
 
 @Composable
 fun CommentItem(comment: Comment, viewModel: PostDetailViewModel) {
-    var photoUrl by remember { mutableStateOf(comment.userPhotoUrl) }
+    var photoUrl by remember(comment.id) { mutableStateOf(comment.userPhotoUrl) }
     
-    LaunchedEffect(comment.userId) {
-        if (photoUrl.isEmpty()) {
-            photoUrl = viewModel.getUserPhoto(comment.userId) ?: ""
+    LaunchedEffect(comment.userId, comment.userPhotoUrl) {
+        if (photoUrl.isBlank() && comment.userId.isNotBlank()) {
+            val fetchedPhoto = viewModel.getUserPhoto(comment.userId)
+            if (fetchedPhoto != null) {
+                photoUrl = fetchedPhoto
+            }
         }
     }
 
