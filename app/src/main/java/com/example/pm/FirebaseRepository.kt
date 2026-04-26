@@ -30,14 +30,15 @@ class FirebaseRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
-    fun getCurrentUserFlow(): Flow<User?> = callbackFlow {
-        val uid = auth.currentUser?.uid
-        if (uid == null) {
+    fun getCurrentUserFlow(): Flow<User?> = getUserFlow(auth.currentUser?.uid ?: "")
+
+    fun getUserFlow(userId: String): Flow<User?> = callbackFlow {
+        if (userId.isEmpty()) {
             trySend(null)
             close()
             return@callbackFlow
         }
-        val listener = firestore.collection("users").document(uid)
+        val listener = firestore.collection("users").document(userId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) return@addSnapshotListener
                 trySend(snapshot?.toObject(User::class.java))
@@ -66,6 +67,11 @@ class FirebaseRepository @Inject constructor(
     suspend fun updateGhostMode(enabled: Boolean) {
         val uid = auth.currentUser?.uid ?: return
         firestore.collection("users").document(uid).update("ghostMode", enabled).await()
+    }
+
+    suspend fun updateOnlineStatus(isOnline: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+        firestore.collection("users").document(uid).update("isOnline", isOnline)
     }
 
     suspend fun getOtherUser(userId: String): User? {
@@ -197,8 +203,6 @@ class FirebaseRepository @Inject constructor(
         
         if (allUids.isEmpty()) {
             trySend(emptyList())
-            // No cerramos para permitir que el emisor siga activo si uids cambia
-            // pero como uids es un parámetro estático, cerramos si no hay nada que escuchar.
             close()
             return@callbackFlow
         }
@@ -293,6 +297,16 @@ class FirebaseRepository @Inject constructor(
                 isRead = false
             ))
         }
+    }
+
+    suspend fun createChatMessageVideo(chatId: String, uri: Uri) {
+        val videoUrl = uploadFile(uri, "chat_videos", true)
+        val thumbnailBitmap = generateVideoThumbnail(uri)
+        val imageUrl = if (thumbnailBitmap != null) {
+            uploadBitmap(thumbnailBitmap, "chat_thumbnails")
+        } else null
+        
+        sendMessage(chatId, "", imageUrl = imageUrl, videoUrl = videoUrl)
     }
 
     fun setTyping(chatId: String, isTyping: Boolean) {
@@ -423,9 +437,11 @@ class FirebaseRepository @Inject constructor(
 
     suspend fun toggleCommentLike(postId: String, commentId: String) {
         val uid = auth.currentUser?.uid ?: return
+        val user = getCurrentUser() ?: return
         val commentRef = firestore.collection("posts").document(postId).collection("comments").document(commentId)
         val doc = commentRef.get().await()
         val likedBy = doc.get("likedBy") as? List<String> ?: emptyList()
+        val commentOwnerId = doc.getString("userId") ?: ""
         
         if (likedBy.contains(uid)) {
             commentRef.update(
@@ -437,6 +453,18 @@ class FirebaseRepository @Inject constructor(
                 "likedBy", FieldValue.arrayUnion(uid),
                 "likesCount", FieldValue.increment(1)
             ).await()
+            
+            // Enviar notificación al dueño del comentario
+            if (commentOwnerId.isNotEmpty() && commentOwnerId != uid) {
+                sendNotification(ActivityNotification(
+                    fromUserId = uid,
+                    fromUsername = user.username,
+                    toUserId = commentOwnerId,
+                    type = "comment_like",
+                    targetId = postId,
+                    isRead = false
+                ))
+            }
         }
     }
 

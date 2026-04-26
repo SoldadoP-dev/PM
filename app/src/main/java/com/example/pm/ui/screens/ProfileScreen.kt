@@ -261,7 +261,14 @@ fun ProfileScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(recommendedUsers) { recUser ->
-                                        SuggestedUserCard(recUser) { rootNavController.navigate("otherProfile/${recUser.uid}") }
+                                        val mutualCount = user?.followingUids?.intersect(recUser.followingUids.toSet())?.size ?: 0
+                                        SuggestedUserCard(
+                                            user = recUser, 
+                                            mutualCount = mutualCount,
+                                            onRemoveClick = { viewModel.removeRecommendedUser(recUser.uid) },
+                                            onFollowClick = { viewModel.followUser(recUser.uid) },
+                                            onUserClick = { rootNavController.navigate("otherProfile/${recUser.uid}") }
+                                        )
                                     }
                                 }
                             }
@@ -391,7 +398,13 @@ fun ProfileEmptyState(text: String, launcher: androidx.activity.result.ActivityR
 }
 
 @Composable
-fun SuggestedUserCard(user: User, onClick: () -> Unit) {
+fun SuggestedUserCard(
+    user: User, 
+    mutualCount: Int,
+    onRemoveClick: () -> Unit, 
+    onFollowClick: () -> Unit,
+    onUserClick: () -> Unit
+) {
     Card(
         modifier = Modifier.width(150.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF121212)),
@@ -400,7 +413,7 @@ fun SuggestedUserCard(user: User, onClick: () -> Unit) {
     ) {
         Box {
             IconButton(
-                onClick = { },
+                onClick = onRemoveClick,
                 modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp)
             ) {
                 Icon(Icons.Default.Close, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
@@ -409,13 +422,37 @@ fun SuggestedUserCard(user: User, onClick: () -> Unit) {
                 modifier = Modifier.padding(12.dp).fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                UserAvatar(user.photoUrl, user.username, 60.dp)
+                UserAvatar(
+                    url = user.photoUrl, 
+                    username = user.username, 
+                    size = 60.dp,
+                    onClick = onUserClick
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(user.username, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
-                Text("2 amigos en común", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                Text(
+                    text = user.username, 
+                    color = Color.White, 
+                    fontWeight = FontWeight.Bold, 
+                    fontSize = 13.sp, 
+                    maxLines = 1,
+                    modifier = Modifier.clickable { onUserClick() }
+                )
+                val mutualText = when {
+                    mutualCount == 0 -> "Sin amigos en comun"
+                    mutualCount == 1 -> "1 amigo en común"
+                    else -> "$mutualCount amigos en común"
+                }
+                Text(
+                    mutualText, 
+                    color = Color.Gray, 
+                    fontSize = 12.sp, 
+                    modifier = Modifier.padding(top = 2.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = onClick,
+                    onClick = onFollowClick,
                     modifier = Modifier.fillMaxWidth().height(28.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0095F6)),
                     shape = RoundedCornerShape(8.dp),

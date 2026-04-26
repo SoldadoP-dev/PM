@@ -18,6 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -63,6 +66,16 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Observador global para el estado online/offline
+        ProcessLifecycleOwner.get().lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            val uid = auth.currentUser?.uid ?: return@LifecycleEventObserver
+            when (event) {
+                Lifecycle.Event.ON_START -> setUserOnlineStatus(uid, true)
+                Lifecycle.Event.ON_STOP -> setUserOnlineStatus(uid, false)
+                else -> {}
+            }
+        })
+
         setContent {
             PMTheme(darkTheme = true) {
                 val navController = rememberNavController()
@@ -76,16 +89,6 @@ class MainActivity : ComponentActivity() {
                 AppNavigation(navController, auth)
             }
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        auth.currentUser?.uid?.let { setUserOnlineStatus(it, true) }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        auth.currentUser?.uid?.let { setUserOnlineStatus(it, false) }
     }
 
     private fun setUserOnlineStatus(uid: String, isOnline: Boolean) {
@@ -107,7 +110,7 @@ class MainActivity : ComponentActivity() {
                         navController.navigate("chat/$targetId/$encodedName/$fromUserId")
                     }
                 }
-                "like", "comment" -> {
+                "like", "comment", "comment_like" -> {
                     navController.navigate("postDetail/$targetId")
                 }
                 "follow_request" -> {
@@ -144,12 +147,14 @@ class MainActivity : ComponentActivity() {
                                 "message" -> "Nuevo mensaje de ${notif.fromUsername}"
                                 "like" -> "Nuevo Like"
                                 "comment" -> "Nuevo Comentario"
+                                "comment_like" -> "Le gusta tu respuesta"
                                 "follow_request" -> "Solicitud de seguimiento"
                                 else -> "Notificación de PM"
                             }
                             val message = when(notif.type) {
                                 "message", "comment" -> notif.content
                                 "like" -> "${notif.fromUsername} le dio like a tu post"
+                                "comment_like" -> "A ${notif.fromUsername} le gusta tu comentario"
                                 "follow_request" -> "${notif.fromUsername} quiere seguirte"
                                 else -> "Tienes una nueva actividad"
                             }

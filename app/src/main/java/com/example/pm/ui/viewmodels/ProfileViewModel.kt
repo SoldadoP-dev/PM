@@ -55,6 +55,8 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             repository.getCurrentUserFlow().collect {
                 _user.value = it
+                // Recargar recomendaciones si el usuario cambia (por ejemplo, al ocultar a alguien)
+                loadRecommendedUsers()
             }
         }
         viewModelScope.launch {
@@ -69,22 +71,29 @@ class ProfileViewModel @Inject constructor(
             val currentUser = repository.getCurrentUser() ?: return@launch
             val allUsers = repository.getAllUsers()
             
-            // Lógica de recomendación: 
-            // 1. Usuarios que siguen a personas que yo sigo (amigos de amigos)
-            // 2. Usuarios que me siguen pero yo no sigo
-            // 3. Otros usuarios de la plataforma
-            
             val followingSet = currentUser.followingUids.toSet()
+            val hiddenSet = currentUser.hiddenUids.toSet()
             
             val recommendations = allUsers.filter { otherUser ->
-                otherUser.uid != currentUser.uid && !followingSet.contains(otherUser.uid)
+                otherUser.uid != currentUser.uid && 
+                !followingSet.contains(otherUser.uid) &&
+                !hiddenSet.contains(otherUser.uid)
             }.sortedByDescending { otherUser ->
-                // Puntuación simple por amigos en común
                 val otherFollowing = otherUser.followingUids.toSet()
                 followingSet.intersect(otherFollowing).size
             }.take(20)
             
             _recommendedUsers.value = recommendations
+        }
+    }
+
+    fun removeRecommendedUser(userId: String) {
+        viewModelScope.launch {
+            val myUid = auth.currentUser?.uid ?: return@launch
+            firestore.collection("users").document(myUid)
+                .update("hiddenUids", com.google.firebase.firestore.FieldValue.arrayUnion(userId))
+                .await()
+            // La actualización se reflejará a través del flow de loadProfile
         }
     }
 

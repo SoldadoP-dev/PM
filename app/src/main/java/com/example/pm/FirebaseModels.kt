@@ -18,8 +18,9 @@ data class User(
     val followingUids: List<String> = emptyList(),
     val followerUids: List<String> = emptyList(),
     val pendingFollowRequests: List<String> = emptyList(),
+    val hiddenUids: List<String> = emptyList(),
     val fcmToken: String? = null,
-    val isOnline: Boolean = false,
+    @get:PropertyName("isOnline") @set:PropertyName("isOnline") var isOnline: Boolean = false,
     val ghostMode: Boolean = false
 )
 

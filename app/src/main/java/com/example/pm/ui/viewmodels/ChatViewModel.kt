@@ -83,11 +83,10 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             _isUploadingMedia.value = true
             try {
-                val folder = if (isVideo) "videos" else "chat_media"
-                val url = repository.uploadFile(uri, folder)
                 if (isVideo) {
-                    repository.sendMessage(chatId, "", videoUrl = url)
+                    repository.createChatMessageVideo(chatId, uri)
                 } else {
+                    val url = repository.uploadFile(uri, "chat_media")
                     repository.sendMessage(chatId, "", imageUrl = url)
                 }
             } finally {

@@ -34,12 +34,19 @@ class OtherProfileViewModel @Inject constructor(
     fun loadProfile(userId: String) {
         val currentUid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
-            firestore.collection("users").document(userId).addSnapshotListener { snapshot, _ ->
-                _user.value = snapshot?.toObject(User::class.java)
+            // Escuchar cambios en tiempo real del usuario visitado a través del repositorio
+            repository.getUserFlow(userId).collect {
+                _user.value = it
             }
-            firestore.collection("users").document(currentUid).addSnapshotListener { snapshot, _ ->
-                _currentUser.value = snapshot?.toObject(User::class.java)
+        }
+        viewModelScope.launch {
+            // Escuchar cambios en tiempo real del usuario actual a través del repositorio
+            repository.getUserFlow(currentUid).collect {
+                _currentUser.value = it
             }
+        }
+        viewModelScope.launch {
+            // Cargar posts
             repository.getUserPosts(userId).collect {
                 _posts.value = it
             }

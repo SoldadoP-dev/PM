@@ -59,7 +59,7 @@ fun DiscoverPeopleScreen(
                     user = user,
                     mutualCount = mutualCount,
                     onFollowClick = { viewModel.followUser(user.uid) },
-                    onRemoveClick = { /* Lógica para ocultar sugerencia */ },
+                    onRemoveClick = { viewModel.removeRecommendedUser(user.uid) },
                     onUserClick = { navController.navigate("otherProfile/${user.uid}") }
                 )
             }
@@ -117,15 +117,18 @@ fun DiscoverUserItem(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(user.username, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            if (mutualCount > 0) {
-                Text(
-                    "$mutualCount amigos en común", 
-                    color = Color.Gray, 
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            val mutualText = when {
+                mutualCount == 0 -> "Sin amigos en comun"
+                mutualCount == 1 -> "1 amigo en común"
+                else -> "$mutualCount amigos en común"
             }
+            Text(
+                mutualText, 
+                color = Color.Gray, 
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
         Button(
             onClick = onFollowClick,

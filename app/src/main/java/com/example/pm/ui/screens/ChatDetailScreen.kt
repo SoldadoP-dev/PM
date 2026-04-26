@@ -2,7 +2,7 @@ package com.example.pm.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,11 +32,14 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.pm.Message
 import com.example.pm.ui.components.UserAvatar
+import com.example.pm.ui.components.VideoPlayer
 import com.example.pm.ui.theme.CardGray
 import com.example.pm.ui.theme.DeepSpace
 import com.example.pm.ui.theme.NeonPurple
@@ -177,6 +181,7 @@ fun ChatDetailScreen(
 @Composable
 fun ChatBubble(msg: Message, isMe: Boolean) {
     val isMedia = !msg.imageUrl.isNullOrEmpty() || !msg.videoUrl.isNullOrEmpty()
+    var showFullVideo by remember { mutableStateOf(false) }
     
     Box(
         modifier = Modifier
@@ -189,6 +194,11 @@ fun ChatBubble(msg: Message, isMe: Boolean) {
                 modifier = Modifier
                     .sizeIn(maxWidth = 250.dp)
                     .clip(RoundedCornerShape(16.dp))
+                    .clickable { 
+                        if (!msg.videoUrl.isNullOrEmpty()) {
+                            showFullVideo = true
+                        }
+                    }
             ) {
                 if (!msg.imageUrl.isNullOrEmpty()) {
                     AsyncImage(
@@ -203,6 +213,12 @@ fun ChatBubble(msg: Message, isMe: Boolean) {
                         modifier = Modifier.aspectRatio(1f).background(Color.Black),
                         contentAlignment = Alignment.Center
                     ) {
+                        AsyncImage(
+                            model = msg.imageUrl, // Miniatura
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
                         Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(48.dp))
                     }
                 }
@@ -217,6 +233,37 @@ fun ChatBubble(msg: Message, isMe: Boolean) {
                     color = if (isMe) Color.Black else Color.White,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                 )
+            }
+        }
+    }
+
+    if (showFullVideo && !msg.videoUrl.isNullOrEmpty()) {
+        Dialog(
+            onDismissRequest = { showFullVideo = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            var controlsVisible by remember { mutableStateOf(false) }
+            
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                VideoPlayer(
+                    videoUrl = msg.videoUrl, 
+                    modifier = Modifier.fillMaxSize(),
+                    onToggleControls = { controlsVisible = it }
+                )
+                
+                AnimatedVisibility(
+                    visible = controlsVisible,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    IconButton(
+                        onClick = { showFullVideo = false },
+                        modifier = Modifier.padding(16.dp).background(Color.Black.copy(0.4f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Close, null, tint = Color.White)
+                    }
+                }
             }
         }
     }

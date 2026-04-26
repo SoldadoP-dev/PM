@@ -3,8 +3,10 @@ package com.example.pm.ui.screens
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
@@ -100,6 +102,25 @@ fun SettingsScreen(
                     },
                     colors = SwitchDefaults.colors(checkedThumbColor = NeonPurple, checkedTrackColor = NeonPurple.copy(alpha = 0.5f))
                 )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Logout Button
+            Button(
+                onClick = {
+                    profileViewModel.logout()
+                    navController.navigate("login") {
+                        popUpTo(0)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Logout, null, tint = Color.Red)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Cerrar sesión", color = Color.Red, fontWeight = FontWeight.Bold)
             }
         }
     }

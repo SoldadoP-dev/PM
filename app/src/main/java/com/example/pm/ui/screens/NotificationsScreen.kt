@@ -103,7 +103,7 @@ fun NotificationsScreen(
                         onClick = {
                             viewModel.markAsRead(notif.id)
                             when(notif.type) {
-                                "like", "comment" -> navController.navigate("postDetail/${notif.targetId}")
+                                "like", "comment", "comment_like" -> navController.navigate("postDetail/${notif.targetId}")
                                 "message" -> navController.navigate("chat/${notif.targetId}/${notif.fromUsername}/${notif.fromUserId}")
                             }
                         }
@@ -138,7 +138,8 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
                 text = when(notif.type) {
                     "follow_request" -> "${notif.fromUsername} quiere seguirte"
                     "like" -> "${notif.fromUsername} le dio like a tu post"
-                    "comment" -> "${notif.fromUsername} comentó: ${notif.content}"
+                    "comment" -> "${notif.fromUsername} comentó tu post"
+                    "comment_like" -> "A ${notif.fromUsername} le gusta tu respuesta"
                     "message" -> "${notif.fromUsername} te envió un mensaje"
                     else -> notif.fromUsername
                 },
@@ -150,8 +151,9 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
         supportingContent = { 
             Text(
                 text = when(notif.type) {
+                    "comment", "message" -> notif.content
+                    "like", "comment_like" -> "Toca para ver la publicación"
                     "follow_request" -> "Toca para ver el perfil"
-                    "message", "comment" -> notif.content
                     else -> "Nueva actividad"
                 },
                 color = Color.Gray,
@@ -200,14 +202,14 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
             ) {
                 Icon(
                     imageVector = when(notif.type) {
-                        "like" -> Icons.Default.Favorite
+                        "like", "comment_like" -> Icons.Default.Favorite
                         "comment" -> Icons.AutoMirrored.Filled.Comment
                         "message" -> Icons.AutoMirrored.Filled.Chat
                         "follow_request" -> Icons.Default.PersonAdd
                         else -> Icons.Default.Notifications
                     },
                     contentDescription = null,
-                    tint = if (notif.type == "like") NeonPink else NeonPurple,
+                    tint = if (notif.type == "like" || notif.type == "comment_like") NeonPink else NeonPurple,
                     modifier = Modifier.size(20.dp)
                 )
             }
