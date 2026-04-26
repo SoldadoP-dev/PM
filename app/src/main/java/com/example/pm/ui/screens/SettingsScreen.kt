@@ -1,7 +1,6 @@
 package com.example.pm.ui.screens
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -20,17 +19,24 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.pm.R
 import com.example.pm.ui.theme.DeepSpace
 import com.example.pm.ui.theme.NeonPurple
+import com.example.pm.ui.viewmodels.ProfileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(navController: NavHostController) {
+fun SettingsScreen(
+    navController: NavHostController,
+    profileViewModel: ProfileViewModel = hiltViewModel()
+) {
     val context = LocalContext.current
     val sharedPrefs = context.getSharedPreferences("Settings", Context.MODE_PRIVATE)
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    
+    val user by profileViewModel.user.collectAsState()
     
     var isDarkMap by remember { mutableStateOf(sharedPrefs.getBoolean("dark_map", systemDark)) }
     var isEnglish by remember { mutableStateOf(sharedPrefs.getBoolean("is_english", false)) }
@@ -76,7 +82,6 @@ fun SettingsScreen(navController: NavHostController) {
                     onCheckedChange = {
                         isEnglish = it
                         sharedPrefs.edit().putBoolean("is_english", it).apply()
-                        Toast.makeText(context, "Requiere extraer textos a strings.xml (Próximamente)", Toast.LENGTH_LONG).show()
                     },
                     colors = SwitchDefaults.colors(checkedThumbColor = NeonPurple, checkedTrackColor = NeonPurple.copy(alpha = 0.5f))
                 )
@@ -84,14 +89,14 @@ fun SettingsScreen(navController: NavHostController) {
 
             HorizontalDivider(color = Color.DarkGray)
             
-            // Ghost Mode
+            // Ghost Mode (Libre para todos)
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.VisibilityOff, null, tint = Color.White)
                 Text(stringResource(R.string.ghost_mode), color = Color.White, modifier = Modifier.weight(1f).padding(start = 16.dp), fontSize = 16.sp)
                 Switch(
-                    checked = false,
+                    checked = user?.ghostMode ?: false,
                     onCheckedChange = {
-                        Toast.makeText(context, context.getString(R.string.premium_only), Toast.LENGTH_SHORT).show()
+                        profileViewModel.setGhostMode(it)
                     },
                     colors = SwitchDefaults.colors(checkedThumbColor = NeonPurple, checkedTrackColor = NeonPurple.copy(alpha = 0.5f))
                 )

@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
             val uid = firebaseAuth.currentUser?.uid
             if (uid != null) {
                 startNotificationMonitor(uid)
+                setUserOnlineStatus(uid, true)
             } else {
                 notificationListener?.remove()
                 notificationListener = null
@@ -75,6 +76,21 @@ class MainActivity : ComponentActivity() {
                 AppNavigation(navController, auth)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        auth.currentUser?.uid?.let { setUserOnlineStatus(it, true) }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        auth.currentUser?.uid?.let { setUserOnlineStatus(it, false) }
+    }
+
+    private fun setUserOnlineStatus(uid: String, isOnline: Boolean) {
+        FirebaseFirestore.getInstance().collection("users").document(uid)
+            .update("isOnline", isOnline)
     }
 
     private fun handleNotificationIntent(intent: Intent, navController: NavHostController) {
@@ -204,7 +220,10 @@ fun AppNavigation(navController: NavHostController, auth: FirebaseAuth) {
             val postId = backStackEntry.arguments?.getString("postId") ?: ""
             PostDetailScreen(navController, postId)
         }
+
+        composable("discoverPeople") { DiscoverPeopleScreen(navController) }
         
         composable("settings") { SettingsScreen(navController) }
+        composable("editProfile") { EditProfileScreen(navController) }
     }
 }

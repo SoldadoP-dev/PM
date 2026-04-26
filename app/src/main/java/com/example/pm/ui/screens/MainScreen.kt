@@ -33,6 +33,7 @@ import com.example.pm.ui.theme.NeonPink
 import com.example.pm.ui.theme.NeonPurple
 import com.example.pm.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,12 +70,10 @@ fun MainScreen(
                         }
                     }
                     
-                    // ICONO DE NOTIFICACIONES (CORAZÓN)
                     IconButton(onClick = { rootNavController.navigate("notifications") }) {
                         BadgedBox(
                             badge = {
                                 if (hasUnread) {
-                                    // Círculo rojo pequeño y elegante
                                     Badge(
                                         containerColor = NeonPink,
                                         modifier = Modifier.size(8.dp).offset(x = (-4).dp, y = 4.dp)
@@ -112,7 +111,7 @@ fun MainScreen(
                 beyondViewportPageCount = 0,
                 userScrollEnabled = pagerState.currentPage != 0
             ) { page ->
-                val isVisible = Math.abs(pagerState.currentPage - page) <= 1
+                val isVisible = abs(pagerState.currentPage - page) <= 1
                 if (isVisible) {
                     when (page) {
                         0 -> HomeScreen(

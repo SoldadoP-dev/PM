@@ -18,7 +18,9 @@ data class User(
     val followingUids: List<String> = emptyList(),
     val followerUids: List<String> = emptyList(),
     val pendingFollowRequests: List<String> = emptyList(),
-    val fcmToken: String? = null
+    val fcmToken: String? = null,
+    val isOnline: Boolean = false,
+    val ghostMode: Boolean = false
 )
 
 /**
@@ -63,7 +65,8 @@ data class Story(
     val userPhotoUrl: String = "", 
     val imageUrl: String = "",
     val videoUrl: String? = null,
-    val expiresAt: Timestamp = Timestamp.now()
+    val expiresAt: Timestamp = Timestamp.now(),
+    val seenBy: List<String> = emptyList()
 )
 
 /**
@@ -132,5 +135,7 @@ data class Comment(
     val username: String = "",
     val userPhotoUrl: String = "",
     val text: String = "",
-    val timestamp: Timestamp = Timestamp.now()
+    val timestamp: Timestamp = Timestamp.now(),
+    val likesCount: Int = 0,
+    val likedBy: List<String> = emptyList()
 )

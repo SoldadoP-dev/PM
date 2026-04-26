@@ -50,8 +50,44 @@ class FirebaseRepository @Inject constructor(
         return firestore.collection("users").document(uid).get().await().toObject(User::class.java)
     }
 
+    suspend fun getAllUsers(): List<User> {
+        return firestore.collection("users").get().await().toObjects(User::class.java)
+    }
+
+    suspend fun updateUser(username: String, bio: String, photoUrl: String) {
+        val uid = auth.currentUser?.uid ?: return
+        firestore.collection("users").document(uid).update(
+            "username", username,
+            "bio", bio,
+            "photoUrl", photoUrl
+        ).await()
+    }
+
+    suspend fun updateGhostMode(enabled: Boolean) {
+        val uid = auth.currentUser?.uid ?: return
+        firestore.collection("users").document(uid).update("ghostMode", enabled).await()
+    }
+
     suspend fun getOtherUser(userId: String): User? {
         return firestore.collection("users").document(userId).get().await().toObject(User::class.java)
+    }
+
+    suspend fun getOrCreateChat(targetUserId: String, onResult: (String) -> Unit) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        val participants = listOf(currentUserId, targetUserId).sorted()
+        
+        val existing = firestore.collection("chats")
+            .whereEqualTo("participants", participants)
+            .get()
+            .await()
+
+        if (!existing.isEmpty) {
+            onResult(existing.documents.first().id)
+        } else {
+            val chatRoom = ChatRoom(participants = participants)
+            val ref = firestore.collection("chats").add(chatRoom).await()
+            onResult(ref.id)
+        }
     }
 
     suspend fun uploadFile(uri: Uri, path: String, isVideo: Boolean = false): String {
@@ -82,28 +118,6 @@ class FirebaseRepository @Inject constructor(
         } catch (e: Exception) {
             null
         }
-    }
-
-    private fun cropTo9x16(bitmap: Bitmap): Bitmap {
-        val width = bitmap.width
-        val height = bitmap.height
-        val targetRatio = 9f / 16f
-        val currentRatio = width.toFloat() / height.toFloat()
-
-        var newWidth = width
-        var newHeight = height
-        var startX = 0
-        var startY = 0
-
-        if (currentRatio > targetRatio) {
-            newWidth = (height * targetRatio).toInt()
-            startX = (width - newWidth) / 2
-        } else if (currentRatio < targetRatio) {
-            newHeight = (width / targetRatio).toInt()
-            startY = (height - newHeight) / 2
-        }
-
-        return Bitmap.createBitmap(bitmap, startX, startY, newWidth, newHeight)
     }
 
     private suspend fun generateVideoThumbnail(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
@@ -152,6 +166,12 @@ class FirebaseRepository @Inject constructor(
         firestore.collection("stories").add(story).await()
     }
 
+    suspend fun markStoryAsSeen(storyId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        firestore.collection("stories").document(storyId)
+            .update("seenBy", FieldValue.arrayUnion(uid)).await()
+    }
+
     suspend fun toggleAttendance(venueId: String, selectedTags: List<String> = emptyList()) {
         val uid = auth.currentUser?.uid ?: return
         val attendanceRef = firestore.collection("attendances")
@@ -172,12 +192,14 @@ class FirebaseRepository @Inject constructor(
         }
     }
 
-    fun getStories(followingUids: List<String>): Flow<List<Story>> = callbackFlow {
-        val uid = auth.currentUser?.uid ?: ""
-        val allUids = (followingUids + uid).filter { it.isNotEmpty() }
+    fun getStories(uids: List<String>): Flow<List<Story>> = callbackFlow {
+        val allUids = uids.filter { it.isNotEmpty() }
         
         if (allUids.isEmpty()) {
             trySend(emptyList())
+            // No cerramos para permitir que el emisor siga activo si uids cambia
+            // pero como uids es un parámetro estático, cerramos si no hay nada que escuchar.
+            close()
             return@callbackFlow
         }
 
@@ -189,10 +211,7 @@ class FirebaseRepository @Inject constructor(
         }
 
         val listener = query.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                android.util.Log.e("FirebaseRepository", "Error getting stories", error)
-                return@addSnapshotListener
-            }
+            if (error != null) return@addSnapshotListener
             val currentTime = Timestamp.now()
             var stories = snapshot?.toObjects(Story::class.java)
                 ?.filter { it.expiresAt > currentTime }
@@ -211,10 +230,7 @@ class FirebaseRepository @Inject constructor(
         val listener = firestore.collection("stories")
             .whereEqualTo("userId", userId)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("FirebaseRepository", "Error getting user stories", error)
-                    return@addSnapshotListener
-                }
+                if (error != null) return@addSnapshotListener
                 val currentTime = Timestamp.now()
                 val stories = snapshot?.toObjects(Story::class.java)
                     ?.filter { it.expiresAt > currentTime }
@@ -403,6 +419,25 @@ class FirebaseRepository @Inject constructor(
                 trySend(comments)
             }
         awaitClose { listener.remove() }
+    }
+
+    suspend fun toggleCommentLike(postId: String, commentId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        val commentRef = firestore.collection("posts").document(postId).collection("comments").document(commentId)
+        val doc = commentRef.get().await()
+        val likedBy = doc.get("likedBy") as? List<String> ?: emptyList()
+        
+        if (likedBy.contains(uid)) {
+            commentRef.update(
+                "likedBy", FieldValue.arrayRemove(uid),
+                "likesCount", FieldValue.increment(-1)
+            ).await()
+        } else {
+            commentRef.update(
+                "likedBy", FieldValue.arrayUnion(uid),
+                "likesCount", FieldValue.increment(1)
+            ).await()
+        }
     }
 
     fun getGlobalPosts(): Flow<List<Post>> = callbackFlow {

@@ -1,6 +1,7 @@
 package com.example.pm.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -26,24 +27,50 @@ import com.example.pm.ui.theme.CardGray
 import com.example.pm.ui.theme.NeonPurple
 
 @Composable
-fun UserAvatar(url: String?, username: String, size: Dp, onClick: (() -> Unit)? = null) {
+fun UserAvatar(
+    url: String?, 
+    username: String, 
+    size: Dp, 
+    isOnline: Boolean = false,
+    ghostMode: Boolean = false,
+    showIndicator: Boolean = false,
+    onClick: (() -> Unit)? = null
+) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
-            .background(CardGray)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         contentAlignment = Alignment.Center
     ) {
-        if (!url.isNullOrEmpty()) {
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(CircleShape)
+                .background(CardGray),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!url.isNullOrEmpty()) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            } else {
+                Text(username.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.4).sp)
+            }
+        }
+
+        // INDICADOR ONLINE REALISTA (Funcional)
+        if (showIndicator) {
+            val statusColor = if (isOnline && !ghostMode) Color(0xFF4CAF50) else Color.Gray
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(size * 0.22f)
+                    .background(statusColor, CircleShape)
+                    .border(2.dp, Color.Black, CircleShape)
             )
-        } else {
-            Text(username.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.4).sp)
         }
     }
 }

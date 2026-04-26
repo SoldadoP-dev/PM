@@ -28,6 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -70,6 +71,7 @@ fun HomeScreen(
 fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
     val currentUser by viewModel.currentUser.collectAsState()
     val stories by viewModel.stories.collectAsState()
+    val seenStories by viewModel.seenStories.collectAsState()
     val isUploading by viewModel.isUploadingStory.collectAsState()
     val context = LocalContext.current
 
@@ -92,12 +94,20 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
     ) {
         item {
             val myStories = groupedStories[currentUser?.uid] ?: emptyList()
+            val allSeen = myStories.isNotEmpty() && myStories.all { seenStories.contains(it.id) }
+            
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(contentAlignment = Alignment.BottomEnd) {
                     Box(
                         modifier = Modifier
                             .size(80.dp)
-                            .border(3.dp, if (myStories.isNotEmpty()) InstaGradient else androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color.Gray, Color.Gray)), CircleShape)
+                            .border(
+                                3.dp, 
+                                if (myStories.isEmpty()) Brush.linearGradient(listOf(Color.DarkGray, Color.DarkGray))
+                                else if (allSeen) Brush.linearGradient(listOf(Color.Gray, Color.Gray))
+                                else InstaGradient, 
+                                CircleShape
+                            )
                             .padding(5.dp)
                             .clip(CircleShape)
                             .background(Color.DarkGray)
@@ -135,11 +145,17 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
             val userStories = groupedStories[userId] ?: emptyList()
             if (userStories.isNotEmpty()) {
                 val firstStory = userStories.first()
+                val allSeen = userStories.all { seenStories.contains(it.id) }
+                
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
                             .size(80.dp)
-                            .border(3.dp, InstaGradient, CircleShape)
+                            .border(
+                                3.dp, 
+                                if (allSeen) Brush.linearGradient(listOf(Color.Gray, Color.Gray)) else InstaGradient, 
+                                CircleShape
+                            )
                             .padding(5.dp)
                             .clip(CircleShape)
                             .background(Color.DarkGray)

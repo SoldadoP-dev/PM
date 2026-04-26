@@ -7,6 +7,7 @@ import com.example.pm.FirebaseRepository
 import com.example.pm.Story
 import com.example.pm.User
 import com.example.pm.Venue
+import com.example.pm.Post
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.GeoPoint
@@ -32,12 +33,20 @@ class HomeViewModel @Inject constructor(
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser
 
+    private val _globalPosts = MutableStateFlow<List<Post>>(emptyList())
+    val globalPosts: StateFlow<List<Post>> = _globalPosts
+
     private val _isUploadingStory = MutableStateFlow(false)
     val isUploadingStory: StateFlow<Boolean> = _isUploadingStory
+
+    // Estado para saber qué historias han sido vistas
+    private val _seenStories = MutableStateFlow<Set<String>>(emptySet())
+    val seenStories: StateFlow<Set<String>> = _seenStories
 
     init {
         loadVenues()
         observeCurrentUserAndStories()
+        loadGlobalPosts()
     }
 
     private fun loadVenues() {
@@ -72,10 +81,21 @@ class HomeViewModel @Inject constructor(
                 _currentUser.value = user
                 if (user != null) {
                     val following = user.followingUids
-                    repository.getStories(following).collect {
-                        _stories.value = it
+                    repository.getStories(following).collect { allStories ->
+                        _stories.value = allStories
+                        // Marcamos como vistas aquellas donde nuestro UID está en seenBy
+                        val seenIds = allStories.filter { it.seenBy.contains(user.uid) }.map { it.id }.toSet()
+                        _seenStories.value = seenIds
                     }
                 }
+            }
+        }
+    }
+
+    private fun loadGlobalPosts() {
+        viewModelScope.launch {
+            repository.getGlobalPosts().collect {
+                _globalPosts.value = it
             }
         }
     }
@@ -90,6 +110,12 @@ class HomeViewModel @Inject constructor(
             } finally {
                 _isUploadingStory.value = false
             }
+        }
+    }
+
+    fun toggleLike(postId: String) {
+        viewModelScope.launch {
+            repository.toggleLike(postId)
         }
     }
 
