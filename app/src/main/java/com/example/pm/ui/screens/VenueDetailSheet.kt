@@ -3,31 +3,36 @@ package com.example.pm.ui.screens
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
-import com.example.pm.Attendance
 import com.example.pm.R
 import com.example.pm.User
 import com.example.pm.Venue
@@ -37,7 +42,7 @@ import com.example.pm.ui.theme.NeonPink
 import com.example.pm.ui.theme.NeonPurple
 import com.example.pm.ui.viewmodels.VenueDetailViewModel
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun VenueDetailSheet(
     venue: Venue,
@@ -50,20 +55,110 @@ fun VenueDetailSheet(
     val tagStats by viewModel.tagStats.collectAsState()
     val tagUsers by viewModel.tagUsers.collectAsState()
     val availableTags by viewModel.availableTags.collectAsState()
+    val otherVenueAttendance by viewModel.otherVenueAttendance.collectAsState()
     
     var showTagSelection by remember { mutableStateOf(false) }
     var selectedTagForList by remember { mutableStateOf<String?>(null) }
+    var showAttendanceConflictDialog by remember { mutableStateOf(false) }
+
+    // Participant search and filter
+    var participantSearchQuery by remember { mutableStateOf("") }
+    var selectedTagFilter by remember { mutableStateOf<String?>(null) }
+
+    val filteredAttendees = remember(attendees, participantSearchQuery, selectedTagFilter, tagUsers) {
+        attendees.filter { user ->
+            val nameMatches = user.username.contains(participantSearchQuery, ignoreCase = true)
+            val tagMatches = if (selectedTagFilter == null) true
+                            else tagUsers[selectedTagFilter]?.any { it.uid == user.uid } == true
+            nameMatches && tagMatches
+        }
+    }
 
     LaunchedEffect(venue.id) {
         viewModel.loadVenueDetails(venue.id)
+    }
+
+    // Pantalla de Aviso de Conflicto (Reforzada - Pantalla Completa)
+    if (showAttendanceConflictDialog && otherVenueAttendance != null) {
+        Dialog(
+            onDismissRequest = { showAttendanceConflictDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color.Black.copy(alpha = 0.98f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(32.dp)
+                        .fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Alerta",
+                        tint = NeonPink,
+                        modifier = Modifier.size(100.dp)
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Text(
+                        text = "¿Cambio de planes?",
+                        color = Color.White,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Black,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Vemos que ya estás apuntado en ${otherVenueAttendance?.name}.\n\nSi decides unirte a ${venue.name}, tu reserva anterior será cancelada automáticamente.\n\n¿Estás seguro de que quieres cambiar?",
+                        color = Color.LightGray,
+                        textAlign = TextAlign.Center,
+                        fontSize = 18.sp,
+                        lineHeight = 28.sp
+                    )
+                    Spacer(modifier = Modifier.height(64.dp))
+                    Button(
+                        onClick = {
+                            showAttendanceConflictDialog = false
+                            showTagSelection = true
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonPurple),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Text(
+                            text = "Sí, confirmar cambio",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 18.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TextButton(
+                        onClick = { showAttendanceConflictDialog = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "No, me quedo donde estoy",
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+            }
+        }
     }
 
     if (showTagSelection) {
         TagSelectionDialog(
             availableTags = availableTags.map { it.name },
             onDismiss = { showTagSelection = false },
-            onConfirm = {
-                viewModel.toggleAttendance(venue.id, it)
+            onConfirm = { tags ->
+                viewModel.toggleAttendance(venue.id, tags)
                 showTagSelection = false
             }
         )
@@ -83,45 +178,19 @@ fun VenueDetailSheet(
     }
 
     Column(modifier = Modifier.padding(24.dp).fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(venue.name, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = NeonPurple)
-                Text("${venue.category} • ${venue.address}", color = Color.Gray, fontSize = 14.sp)
-            }
-            Surface(color = NeonPurple.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
-                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Star, null, tint = NeonPurple, modifier = Modifier.size(16.dp))
-                    Text(venue.rating.toString(), color = NeonPurple, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
-                }
-            }
-        }
-        
-        // ESTADÍSTICAS DE ETIQUETAS
-        if (tagStats.isNotEmpty()) {
-            Text("Lo que se dice de hoy (mantén pulsado):", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 16.dp))
-            LazyRow(
-                modifier = Modifier.padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(tagStats.toList()) { (tagName, count) ->
-                    Surface(
-                        modifier = Modifier.combinedClickable(
-                            onClick = { /* Opcional: algún feedback? */ },
-                            onLongClick = { selectedTagForList = tagName }
-                        ),
-                        color = NeonPurple.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, NeonPurple.copy(alpha = 0.5f))
-                    ) {
-                        Text(
-                            text = "$tagName $count",
-                            color = NeonPurple,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(venue.name, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = NeonPurple)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Surface(color = NeonPurple.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
+                        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Star, null, tint = NeonPurple, modifier = Modifier.size(16.dp))
+                            Text(venue.rating.toString(), color = NeonPurple, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
+                        }
                     }
                 }
+                Text("${venue.category} • ${venue.address}", color = Color.Gray, fontSize = 14.sp)
             }
         }
         
@@ -139,15 +208,88 @@ fun VenueDetailSheet(
             }
         }
 
+        Box(
+            modifier = Modifier
+                .padding(top = 12.dp)
+                .fillMaxWidth()
+                .height(40.dp)
+                .background(Color(0xFF262626), RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp)) {
+                Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                BasicTextField(
+                    value = participantSearchQuery,
+                    onValueChange = { participantSearchQuery = it },
+                    textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
+                    cursorBrush = SolidColor(Color.White),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    decorationBox = { innerTextField ->
+                        if (participantSearchQuery.isEmpty()) {
+                            Text("Buscar por nombre...", color = Color.Gray, fontSize = 14.sp)
+                        }
+                        innerTextField()
+                    }
+                )
+            }
+        }
+
+        if (tagStats.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier.padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                item {
+                    FilterChip(
+                        selected = selectedTagFilter == null,
+                        onClick = { selectedTagFilter = null },
+                        label = { Text("Todos", fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = NeonPurple,
+                            containerColor = Color.DarkGray,
+                            labelColor = Color.Gray,
+                            selectedLabelColor = Color.Black
+                        ),
+                        border = null
+                    )
+                }
+                tagStats.keys.forEach { tagName ->
+                    item {
+                        FilterChip(
+                            selected = selectedTagFilter == tagName,
+                            onClick = { selectedTagFilter = if (selectedTagFilter == tagName) null else tagName },
+                            label = { Text(tagName, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = NeonPurple,
+                                containerColor = Color.DarkGray,
+                                labelColor = Color.Gray,
+                                selectedLabelColor = Color.Black
+                            ),
+                            border = null
+                        )
+                    }
+                }
+            }
+        }
+
         LazyRow(modifier = Modifier.padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            items(attendees) { attendee ->
+            items(filteredAttendees) { attendee ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { navController.navigate("otherProfile/${attendee.uid}") }) {
                     UserAvatar(attendee.photoUrl, attendee.username, size = 50.dp)
                     Text(if (attendee.uid == viewModel.currentUserId) "Tú" else attendee.username, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
                 }
             }
-            if (attendees.isEmpty()) {
-                item { Text(stringResource(R.string.no_one_yet), color = Color.DarkGray, fontSize = 14.sp) }
+            if (filteredAttendees.isEmpty()) {
+                item { 
+                    Text(
+                        text = if (participantSearchQuery.isEmpty()) stringResource(R.string.no_one_yet) else "No se han encontrado resultados", 
+                        color = Color.DarkGray, 
+                        fontSize = 14.sp 
+                    ) 
+                }
             }
         }
 
@@ -156,7 +298,11 @@ fun VenueDetailSheet(
                 if (isAttending) {
                     viewModel.toggleAttendance(venue.id) 
                 } else {
-                    showTagSelection = true
+                    if (otherVenueAttendance != null) {
+                        showAttendanceConflictDialog = true
+                    } else {
+                        showTagSelection = true
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 16.dp),
@@ -214,20 +360,21 @@ fun TagSelectionDialog(
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = NeonPurple,
                                 labelColor = Color.White,
-                                selectedLabelColor = Color.Black
+                                selectedLabelColor = Color.Black,
+                                containerColor = Color.DarkGray
                             )
                         )
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.End) {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = onDismiss) {
                         Text("Cancelar", color = Color.Gray)
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { onConfirm(selected) },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonPurple),
-                        enabled = selected.isNotEmpty()
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
                     ) {
                         Text("Confirmar", color = Color.Black, fontWeight = FontWeight.Bold)
                     }

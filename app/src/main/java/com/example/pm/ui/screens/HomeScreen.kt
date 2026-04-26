@@ -8,7 +8,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -30,10 +30,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -176,48 +177,48 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
 @SuppressLint("MissingPermission")
 @Composable
 fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
-        val context = LocalContext.current
-        val focusManager = LocalFocusManager.current
-        val scope = rememberCoroutineScope()
-        val venues by viewModel.venues.collectAsState()
-        
-        val cameraPositionState = rememberCameraPositionState {
-            position = CameraPosition.fromLatLngZoom(LatLng(40.4168, -3.7038), 14f)
-        }
-        
-        var searchQuery by remember { mutableStateOf("") }
-        var hasPermission by remember { 
-            mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) 
-        }
-        val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasPermission = it }
+    val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
+    val venues by viewModel.venues.collectAsState()
+    
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(40.4168, -3.7038), 14f)
+    }
+    
+    var searchQuery by remember { mutableStateOf("") }
+    var hasPermission by remember { 
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) 
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasPermission = it }
 
-        LaunchedEffect(Unit) {
-            if (!hasPermission) launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
+    LaunchedEffect(Unit) {
+        if (!hasPermission) launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
 
-        val filteredVenues = if (searchQuery.isBlank()) venues 
-                             else venues.filter { it.name.contains(searchQuery, ignoreCase = true) || it.category.contains(searchQuery, ignoreCase = true) }
+    val filteredVenues = if (searchQuery.isBlank()) venues 
+                         else venues.filter { it.name.contains(searchQuery, ignoreCase = true) || it.category.contains(searchQuery, ignoreCase = true) }
 
-        val sharedPrefs = context.getSharedPreferences("Settings", android.content.Context.MODE_PRIVATE)
-        val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
-        
-        var isDarkMap by remember { mutableStateOf(sharedPrefs.getBoolean("dark_map", systemDark)) }
-        
-        DisposableEffect(sharedPrefs) {
-            val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
-                if (key == "dark_map") {
-                    isDarkMap = prefs.getBoolean("dark_map", systemDark)
-                }
-            }
-            sharedPrefs.registerOnSharedPreferenceChangeListener(listener)
-            onDispose {
-                sharedPrefs.unregisterOnSharedPreferenceChangeListener(listener)
+    val sharedPrefs = context.getSharedPreferences("Settings", android.content.Context.MODE_PRIVATE)
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    
+    var isDarkMap by remember { mutableStateOf(sharedPrefs.getBoolean("dark_map", systemDark)) }
+    
+    DisposableEffect(sharedPrefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == "dark_map") {
+                isDarkMap = prefs.getBoolean("dark_map", systemDark)
             }
         }
-        
-        val mapStyleJson = if (isDarkMap) {
-            """[{"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#ffffff"}]},{"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#000000"},{"lightness":13}]},{"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#144b53"},{"lightness":14},{"weight":1.4}]},{"featureType":"landscape","elementType":"all","stylers":[{"color":"#08304b"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#0c4152"},{"lightness":5}]},{"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#0b434f"},{"lightness":25}]},{"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#0b3d51"},{"lightness":16}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"}]},{"featureType":"transit","elementType":"all","stylers":[{"color":"#146474"}]},{"featureType":"water","elementType":"all","stylers":[{"color":"#021019"}]}]"""
-        } else null
+        sharedPrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            sharedPrefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+    
+    val mapStyleJson = if (isDarkMap) {
+        """[{"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#ffffff"}]},{"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#000000"},{"lightness":13}]},{"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#144b53"},{"lightness":14},{"weight":1.4}]},{"featureType":"landscape","elementType":"all","stylers":[{"color":"#08304b"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#0c4152"},{"lightness":5}]},{"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#0b434f"},{"lightness":25}]},{"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#0b3d51"},{"lightness":16}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"}]},{"featureType":"transit","elementType":"all","stylers":[{"color":"#146474"}]},{"featureType":"water","elementType":"all","stylers":[{"color":"#021019"}]}]"""
+    } else null
 
     Box(modifier = Modifier.fillMaxSize()) {
         GoogleMap(
@@ -263,6 +264,7 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
             }
         }
 
+        // Buscador coherente con ExploreScreen (40dp de altura, 10dp de radio)
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -270,31 +272,31 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
                 .fillMaxWidth()
                 .zIndex(5f)
         ) {
-            Card(
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.8f)),
-                border = BorderStroke(1.dp, NeonPurple.copy(alpha = 0.5f))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .background(Color(0xFF262626), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.CenterStart
             ) {
-                Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Search, null, tint = NeonPurple)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    TextField(
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp)) {
+                    Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    BasicTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text(stringResource(R.string.search_venue), color = Color.Gray) },
-                        modifier = Modifier.weight(1f),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
+                        textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                        cursorBrush = SolidColor(Color.White),
                         singleLine = true,
+                        modifier = Modifier.weight(1f),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
+                        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                        decorationBox = { innerTextField ->
+                            if (searchQuery.isEmpty()) {
+                                Text(stringResource(R.string.search_venue), color = Color.Gray, fontSize = 16.sp)
+                            }
+                            innerTextField()
+                        }
                     )
                 }
             }

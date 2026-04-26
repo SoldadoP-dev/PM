@@ -192,7 +192,8 @@ fun ChatBubble(msg: Message, isMe: Boolean) {
         if (isMedia) {
             Box(
                 modifier = Modifier
-                    .sizeIn(maxWidth = 250.dp)
+                    .width(250.dp)
+                    .aspectRatio(0.75f)
                     .clip(RoundedCornerShape(16.dp))
                     .clickable { 
                         if (!msg.videoUrl.isNullOrEmpty()) {
@@ -200,17 +201,9 @@ fun ChatBubble(msg: Message, isMe: Boolean) {
                         }
                     }
             ) {
-                if (!msg.imageUrl.isNullOrEmpty()) {
-                    AsyncImage(
-                        model = msg.imageUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentScale = ContentScale.FillWidth
-                    )
-                }
                 if (!msg.videoUrl.isNullOrEmpty()) {
                     Box(
-                        modifier = Modifier.aspectRatio(1f).background(Color.Black),
+                        modifier = Modifier.fillMaxSize().background(Color.Black),
                         contentAlignment = Alignment.Center
                     ) {
                         AsyncImage(
@@ -219,8 +212,20 @@ fun ChatBubble(msg: Message, isMe: Boolean) {
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
-                        Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(48.dp))
+                        Icon(
+                            imageVector = Icons.Default.PlayCircle,
+                            contentDescription = "Reproducir",
+                            tint = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(56.dp)
+                        )
                     }
+                } else if (!msg.imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = msg.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
                 }
             }
         } else {

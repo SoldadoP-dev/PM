@@ -189,6 +189,12 @@ class FirebaseRepository @Inject constructor(
             .await()
 
         if (existing.isEmpty) {
+            // Eliminar cualquier otra asistencia antes de agregar la nueva
+            val otherAttendances = attendanceRef.whereEqualTo("userId", uid).get().await()
+            for (doc in otherAttendances.documents) {
+                doc.reference.delete().await()
+            }
+            
             val attendance = Attendance(userId = uid, venueId = venueId, selectedTags = selectedTags)
             attendanceRef.add(attendance).await()
         } else {
@@ -196,6 +202,36 @@ class FirebaseRepository @Inject constructor(
                 doc.reference.delete().await()
             }
         }
+    }
+
+    suspend fun getUserAttendance(): Attendance? {
+        val uid = auth.currentUser?.uid ?: return null
+        val snapshot = firestore.collection("attendances")
+            .whereEqualTo("userId", uid)
+            .get()
+            .await()
+        return snapshot.toObjects(Attendance::class.java).firstOrNull()
+    }
+
+    fun getUserAttendanceFlow(): Flow<Attendance?> = callbackFlow {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            trySend(null)
+            close()
+            return@callbackFlow
+        }
+        val listener = firestore.collection("attendances")
+            .whereEqualTo("userId", uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                trySend(snapshot?.toObjects(Attendance::class.java)?.firstOrNull())
+            }
+        awaitClose { listener.remove() }
+    }
+    
+    suspend fun getVenueById(venueId: String): Venue? {
+        if (venueId.isEmpty()) return null
+        return firestore.collection("venues").document(venueId).get().await().toObject(Venue::class.java)
     }
 
     fun getStories(uids: List<String>): Flow<List<Story>> = callbackFlow {
