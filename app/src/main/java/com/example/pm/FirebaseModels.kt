@@ -33,6 +33,8 @@ data class Venue(
     var location: GeoPoint = GeoPoint(0.0, 0.0),
     var address: String = "",
     var rating: Double = 0.0,
+    var photoUrl: String = "",
+    var logoUrl: String = "",
     @get:PropertyName("Category") @set:PropertyName("Category") var category: String = ""
 )
 

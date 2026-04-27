@@ -248,7 +248,7 @@ fun ProfileScreen(
                                     Text("Descubre personas", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                     Text(
                                         "Ver todo", 
-                                        color = Color(0xFF0095F6), 
+                                        color = Color(0xFF833AB4),
                                         fontWeight = FontWeight.Bold, 
                                         fontSize = 14.sp,
                                         modifier = Modifier.clickable { 
@@ -344,7 +344,7 @@ fun ProfileScreen(
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = Color(0xFF0095F6),
+                            color = Color(0xFF833AB4),
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(16.dp))
@@ -454,7 +454,7 @@ fun SuggestedUserCard(
                 Button(
                     onClick = onFollowClick,
                     modifier = Modifier.fillMaxWidth().height(28.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0095F6)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF833AB4)),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(0.dp)
                 ) {

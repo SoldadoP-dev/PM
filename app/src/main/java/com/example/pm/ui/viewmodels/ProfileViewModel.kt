@@ -143,22 +143,17 @@ class ProfileViewModel @Inject constructor(
     fun followUser(targetUserId: String) {
         viewModelScope.launch {
             val currentUser = repository.getCurrentUser() ?: return@launch
-            // Aquí se enviaría una solicitud o se seguiría directamente según la privacidad del usuario
-            // Por ahora, seguimiento directo
-            firestore.collection("users").document(currentUser.uid)
-                .update("followingUids", com.google.firebase.firestore.FieldValue.arrayUnion(targetUserId),
-                        "followingCount", com.google.firebase.firestore.FieldValue.increment(1)).await()
-            
+            // Enviar solicitud de seguimiento
             firestore.collection("users").document(targetUserId)
-                .update("followerUids", com.google.firebase.firestore.FieldValue.arrayUnion(currentUser.uid),
-                        "followersCount", com.google.firebase.firestore.FieldValue.increment(1)).await()
+                .update("pendingFollowRequests", com.google.firebase.firestore.FieldValue.arrayUnion(currentUser.uid))
+                .await()
             
             repository.sendNotification(ActivityNotification(
                 fromUserId = currentUser.uid,
                 fromUsername = currentUser.username,
                 toUserId = targetUserId,
-                type = "follow",
-                content = "${currentUser.username} ha empezado a seguirte"
+                type = "follow_request",
+                content = "${currentUser.username} quiere seguirte"
             ))
         }
     }

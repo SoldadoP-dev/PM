@@ -204,7 +204,7 @@ fun UserSearchItem(user: User, currentUser: User?, viewModel: ExploreViewModel, 
                 colors = ButtonDefaults.buttonColors(
                     containerColor = when {
                         isFollowing || isPending -> Color.DarkGray
-                        else -> Color(0xFF0095F6)
+                        else -> Color(0xFF833AB4)
                     },
                     disabledContainerColor = Color.DarkGray,
                     disabledContentColor = Color.White

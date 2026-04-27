@@ -135,10 +135,22 @@ fun VenueDetailSheet(
         )
     }
 
-    Column(modifier = Modifier.padding(24.dp).fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (venue.photoUrl.isNotEmpty()) {
+            coil.compose.AsyncImage(
+                model = venue.photoUrl,
+                contentDescription = "Foto de ${venue.name}",
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            )
+        }
+
+        Column(modifier = Modifier.padding(24.dp).fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(venue.name, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = NeonPurple)
                     Spacer(modifier = Modifier.width(12.dp))
                     Surface(color = NeonPurple.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
@@ -276,6 +288,7 @@ fun VenueDetailSheet(
             )
         }
         Spacer(modifier = Modifier.height(32.dp))
+    }
     }
 }
 

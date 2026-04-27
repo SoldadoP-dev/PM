@@ -187,7 +187,7 @@ fun MessagesListScreen(
                             Box(
                                 modifier = Modifier
                                     .size(20.dp)
-                                    .background(Color(0xFF0095F6), CircleShape)
+                                    .background(Color(0xFF833AB4), CircleShape)
                                     .border(2.dp, Color.Black, CircleShape)
                                     .clickable { 
                                         storyLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
@@ -250,7 +250,7 @@ fun MessagesListScreen(
                 Text("Mensajes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(
                     text = "Solicitudes", 
-                    color = Color(0xFF0095F6), 
+                    color = Color(0xFF833AB4),
                     fontWeight = FontWeight.Bold, 
                     fontSize = 14.sp,
                     modifier = Modifier.clickable { rootNavController.navigate("notifications") }
@@ -364,7 +364,7 @@ fun EnrichedChatItemWithFilter(
                 Box(
                     modifier = Modifier
                         .size(18.dp)
-                        .background(Color(0xFF0095F6), CircleShape),
+                        .background(Color(0xFF833AB4), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(unreadCount.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)

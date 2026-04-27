@@ -55,9 +55,11 @@ fun DiscoverPeopleScreen(
             // Sugerencias
             items(recommendedUsers) { user ->
                 val mutualCount = currentUser?.followingUids?.intersect(user.followingUids.toSet())?.size ?: 0
+                val isPending = user.pendingFollowRequests.contains(currentUser?.uid ?: "")
                 DiscoverUserItem(
                     user = user,
                     mutualCount = mutualCount,
+                    isPending = isPending,
                     onFollowClick = { viewModel.followUser(user.uid) },
                     onRemoveClick = { viewModel.removeRecommendedUser(user.uid) },
                     onUserClick = { navController.navigate("otherProfile/${user.uid}") }
@@ -77,7 +79,7 @@ fun DiscoverPeopleScreen(
                         Text("Solicitudes de seguimiento", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Text(
                             "Ver todo", 
-                            color = Color(0xFF0095F6), 
+                            color = Color(0xFF833AB4),
                             fontSize = 14.sp, 
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable { /* Navegar a solicitudes si hubiera otra pantalla */ }
@@ -102,6 +104,7 @@ fun DiscoverPeopleScreen(
 fun DiscoverUserItem(
     user: User,
     mutualCount: Int,
+    isPending: Boolean,
     onFollowClick: () -> Unit,
     onRemoveClick: () -> Unit,
     onUserClick: () -> Unit
@@ -131,13 +134,15 @@ fun DiscoverUserItem(
             )
         }
         Button(
-            onClick = onFollowClick,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0095F6)),
+            onClick = { if (!isPending) onFollowClick() },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isPending) Color(0xFF262626) else Color(0xFF833AB4)
+            ),
             shape = RoundedCornerShape(8.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
             modifier = Modifier.height(32.dp)
         ) {
-            Text("Seguir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(if (isPending) "Pendiente" else "Seguir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
         IconButton(onClick = onRemoveClick) {
             Icon(Icons.Default.Close, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
@@ -171,7 +176,7 @@ fun FollowRequestItem(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0095F6)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF833AB4)),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.height(32.dp)
             ) {

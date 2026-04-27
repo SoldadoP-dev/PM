@@ -39,6 +39,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material.icons.filled.LocationOn
+import coil.compose.AsyncImage
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -174,6 +177,8 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
     }
 }
 
+
+
 @SuppressLint("MissingPermission")
 @Composable
 fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
@@ -231,9 +236,20 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
             uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = true)
         ) {
             filteredVenues.forEach { venue ->
-                Marker(
+                val imageToLoad = if (venue.logoUrl.isNotEmpty()) venue.logoUrl else venue.photoUrl
+                val painter = coil.compose.rememberAsyncImagePainter(
+                    model = coil.request.ImageRequest.Builder(LocalContext.current)
+                        .data(imageToLoad)
+                        .allowHardware(false) // <- IMPORTANTE para mapas
+                        .crossfade(true)
+                        .build()
+                )
+                val painterState = painter.state
+
+                MarkerComposable(
                     state = MarkerState(position = LatLng(venue.location.latitude, venue.location.longitude)),
                     title = venue.name,
+                    keys = arrayOf(venue.id, imageToLoad, painterState),
                     onClick = { 
                         onVenueClick(venue)
                         scope.launch {
@@ -243,7 +259,32 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
                         }
                         true 
                     }
-                )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .border(2.dp, NeonPurple, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (imageToLoad.isNotEmpty()) {
+                            androidx.compose.foundation.Image(
+                                painter = painter,
+                                contentDescription = venue.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = NeonPink,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -324,3 +365,4 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
         }
     }
 }
+

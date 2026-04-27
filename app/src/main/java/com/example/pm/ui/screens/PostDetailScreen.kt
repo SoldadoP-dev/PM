@@ -270,7 +270,7 @@ fun PostDetailScreen(
                                 commentText = ""
                                 focusManager.clearFocus()
                             }) {
-                                Text("Publicar", color = Color(0xFF0095F6), fontWeight = FontWeight.Bold)
+                                Text("Publicar", color = Color(0xFF833AB4), fontWeight = FontWeight.Bold)
                             }
                         }
                     }

@@ -115,7 +115,7 @@ fun EditProfileScreen(
                 Box(
                     modifier = Modifier
                         .size(30.dp)
-                        .background(Color(0xFF0095F6), CircleShape)
+                        .background(Color(0xFF833AB4), CircleShape)
                         .border(2.dp, Color.Black, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -236,7 +236,7 @@ fun EditProfileScreen(
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0095F6)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF833AB4)),
                 enabled = !isSaving
             ) {
                 if (isSaving) {

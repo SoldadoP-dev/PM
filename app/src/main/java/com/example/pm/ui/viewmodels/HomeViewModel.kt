@@ -64,6 +64,8 @@ class HomeViewModel @Inject constructor(
                                 location = doc.getGeoPoint("location") ?: GeoPoint(40.41, -3.70),
                                 address = doc.getString("address") ?: doc.getString("Address") ?: "Madrid",
                                 rating = (doc.get("rating") ?: doc.get("Rating") ?: 0.0).toString().toDoubleOrNull() ?: 0.0,
+                                photoUrl = doc.getString("photoUrl") ?: "",
+                                logoUrl = doc.getString("logoUrl") ?: "",
                                 category = doc.getString("Category") ?: doc.getString("category") ?: "Club"
                             )
                         } catch (e: Exception) { null }
