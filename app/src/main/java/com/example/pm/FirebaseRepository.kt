@@ -190,10 +190,7 @@ class FirebaseRepository @Inject constructor(
 
         if (existing.isEmpty) {
             // Eliminar cualquier otra asistencia antes de agregar la nueva
-            val otherAttendances = attendanceRef.whereEqualTo("userId", uid).get().await()
-            for (doc in otherAttendances.documents) {
-                doc.reference.delete().await()
-            }
+            clearAttendance()
             
             val attendance = Attendance(userId = uid, venueId = venueId, selectedTags = selectedTags)
             attendanceRef.add(attendance).await()
@@ -201,6 +198,15 @@ class FirebaseRepository @Inject constructor(
             for (doc in existing.documents) {
                 doc.reference.delete().await()
             }
+        }
+    }
+
+    suspend fun clearAttendance() {
+        val uid = auth.currentUser?.uid ?: return
+        val attendanceRef = firestore.collection("attendances")
+        val otherAttendances = attendanceRef.whereEqualTo("userId", uid).get().await()
+        for (doc in otherAttendances.documents) {
+            doc.reference.delete().await()
         }
     }
 

@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -47,7 +48,10 @@ class VenueDetailViewModel @Inject constructor(
     private val _otherVenueAttendance = MutableStateFlow<Venue?>(null)
     val otherVenueAttendance: StateFlow<Venue?> = _otherVenueAttendance
 
-    private var currentVenueId: String? = null
+    private val _hasOtherAttendance = MutableStateFlow(false)
+    val hasOtherAttendance: StateFlow<Boolean> = _hasOtherAttendance
+
+    private val _currentVenueId = MutableStateFlow<String?>(null)
 
     init {
         loadTags()
@@ -64,10 +68,14 @@ class VenueDetailViewModel @Inject constructor(
 
     private fun observeUserAttendance() {
         viewModelScope.launch {
-            repository.getUserAttendanceFlow().collectLatest { attendance ->
-                if (attendance != null && attendance.venueId != currentVenueId) {
+            combine(repository.getUserAttendanceFlow(), _currentVenueId) { attendance, venueId ->
+                attendance to venueId
+            }.collectLatest { (attendance, venueId) ->
+                if (attendance != null && venueId != null && attendance.venueId != venueId) {
+                    _hasOtherAttendance.value = true
                     _otherVenueAttendance.value = repository.getVenueById(attendance.venueId)
                 } else {
+                    _hasOtherAttendance.value = false
                     _otherVenueAttendance.value = null
                 }
             }
@@ -75,16 +83,8 @@ class VenueDetailViewModel @Inject constructor(
     }
 
     fun loadVenueDetails(venueId: String) {
-        currentVenueId = venueId
+        _currentVenueId.value = venueId
         viewModelScope.launch {
-            // Verificar si ya tiene otra asistencia al cargar
-            val userAttendance = repository.getUserAttendance()
-            if (userAttendance != null && userAttendance.venueId != venueId) {
-                _otherVenueAttendance.value = repository.getVenueById(userAttendance.venueId)
-            } else {
-                _otherVenueAttendance.value = null
-            }
-
             repository.getVenueAttendances(venueId).collect { attendances ->
                 _attendancesCount.value = attendances.size
                 _isAttending.value = attendances.any { it.userId == currentUserId }
@@ -130,6 +130,12 @@ class VenueDetailViewModel @Inject constructor(
     fun toggleAttendance(venueId: String, selectedTags: List<String> = emptyList()) {
         viewModelScope.launch {
             repository.toggleAttendance(venueId, selectedTags)
+        }
+    }
+
+    fun clearCurrentAttendance() {
+        viewModelScope.launch {
+            repository.clearAttendance()
         }
     }
 }

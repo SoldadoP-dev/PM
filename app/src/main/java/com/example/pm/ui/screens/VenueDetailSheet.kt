@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +29,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.pm.R
@@ -38,7 +36,6 @@ import com.example.pm.User
 import com.example.pm.Venue
 import com.example.pm.ui.components.UserAvatar
 import com.example.pm.ui.theme.CardGray
-import com.example.pm.ui.theme.NeonPink
 import com.example.pm.ui.theme.NeonPurple
 import com.example.pm.ui.viewmodels.VenueDetailViewModel
 
@@ -56,6 +53,7 @@ fun VenueDetailSheet(
     val tagUsers by viewModel.tagUsers.collectAsState()
     val availableTags by viewModel.availableTags.collectAsState()
     val otherVenueAttendance by viewModel.otherVenueAttendance.collectAsState()
+    val hasOtherAttendance by viewModel.hasOtherAttendance.collectAsState()
     
     var showTagSelection by remember { mutableStateOf(false) }
     var selectedTagForList by remember { mutableStateOf<String?>(null) }
@@ -78,79 +76,39 @@ fun VenueDetailSheet(
         viewModel.loadVenueDetails(venue.id)
     }
 
-    // Pantalla de Aviso de Conflicto (Reforzada - Pantalla Completa)
-    if (showAttendanceConflictDialog && otherVenueAttendance != null) {
-        Dialog(
+    // Diálogo de Confirmación simplificado (Popup sin icono)
+    if (showAttendanceConflictDialog) {
+        AlertDialog(
             onDismissRequest = { showAttendanceConflictDialog = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = Color.Black.copy(alpha = 0.98f)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(32.dp)
-                        .fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+            title = { Text(text = "¿Cambiar de planes?", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                val otherName = otherVenueAttendance?.name ?: "otra discoteca"
+                Text(
+                    text = "Ya estás apuntado en $otherName. Si te unes a ${venue.name}, se cancelará tu reserva anterior.",
+                    color = Color.LightGray,
+                    fontSize = 16.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearCurrentAttendance()
+                        showAttendanceConflictDialog = false
+                        showTagSelection = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = "Alerta",
-                        tint = NeonPink,
-                        modifier = Modifier.size(100.dp)
-                    )
-                    Spacer(modifier = Modifier.height(32.dp))
-                    Text(
-                        text = "¿Cambio de planes?",
-                        color = Color.White,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = "Vemos que ya estás apuntado en ${otherVenueAttendance?.name}.\n\nSi decides unirte a ${venue.name}, tu reserva anterior será cancelada automáticamente.\n\n¿Estás seguro de que quieres cambiar?",
-                        color = Color.LightGray,
-                        textAlign = TextAlign.Center,
-                        fontSize = 18.sp,
-                        lineHeight = 28.sp
-                    )
-                    Spacer(modifier = Modifier.height(64.dp))
-                    Button(
-                        onClick = {
-                            showAttendanceConflictDialog = false
-                            showTagSelection = true
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(64.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonPurple),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text(
-                            text = "Sí, confirmar cambio",
-                            color = Color.Black,
-                            fontWeight = FontWeight.Black,
-                            fontSize = 18.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    TextButton(
-                        onClick = { showAttendanceConflictDialog = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "No, me quedo donde estoy",
-                            color = Color.Gray,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                    }
+                    Text("Sí, cambiar", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
-            }
-        }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAttendanceConflictDialog = false }) {
+                    Text("Cancelar", color = Color.Gray)
+                }
+            },
+            containerColor = CardGray,
+            shape = RoundedCornerShape(28.dp)
+        )
     }
 
     if (showTagSelection) {
@@ -298,7 +256,7 @@ fun VenueDetailSheet(
                 if (isAttending) {
                     viewModel.toggleAttendance(venue.id) 
                 } else {
-                    if (otherVenueAttendance != null) {
+                    if (hasOtherAttendance) {
                         showAttendanceConflictDialog = true
                     } else {
                         showTagSelection = true
