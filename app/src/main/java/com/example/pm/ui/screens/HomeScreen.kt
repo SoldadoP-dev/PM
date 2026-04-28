@@ -42,6 +42,12 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.filled.LocationOn
 import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import android.graphics.drawable.BitmapDrawable
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -236,55 +242,12 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
             uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = true)
         ) {
             filteredVenues.forEach { venue ->
-                val imageToLoad = if (venue.logoUrl.isNotEmpty()) venue.logoUrl else venue.photoUrl
-                val painter = coil.compose.rememberAsyncImagePainter(
-                    model = coil.request.ImageRequest.Builder(LocalContext.current)
-                        .data(imageToLoad)
-                        .allowHardware(false) // <- IMPORTANTE para mapas
-                        .crossfade(true)
-                        .build()
+                VenueMarker(
+                    venue = venue,
+                    onVenueClick = onVenueClick,
+                    cameraPositionState = cameraPositionState,
+                    scope = scope
                 )
-                val painterState = painter.state
-
-                MarkerComposable(
-                    state = MarkerState(position = LatLng(venue.location.latitude, venue.location.longitude)),
-                    title = venue.name,
-                    keys = arrayOf(venue.id, imageToLoad, painterState),
-                    onClick = { 
-                        onVenueClick(venue)
-                        scope.launch {
-                            cameraPositionState.animate(
-                                CameraUpdateFactory.newLatLngZoom(LatLng(venue.location.latitude, venue.location.longitude), 16f), 1000
-                            )
-                        }
-                        true 
-                    }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                            .border(2.dp, NeonPurple, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (imageToLoad.isNotEmpty()) {
-                            androidx.compose.foundation.Image(
-                                painter = painter,
-                                contentDescription = venue.name,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape)
-                            )
-                        } else {
-                            Icon(
-                                Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = NeonPink,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                }
             }
         }
 
@@ -361,6 +324,75 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun VenueMarker(
+    venue: Venue,
+    onVenueClick: (Venue) -> Unit,
+    cameraPositionState: CameraPositionState,
+    scope: kotlinx.coroutines.CoroutineScope
+) {
+    val imageToLoad = if (venue.logoUrl.isNotEmpty()) venue.logoUrl else venue.photoUrl
+    var imageBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    val context = LocalContext.current
+
+    LaunchedEffect(imageToLoad) {
+        if (imageToLoad.isNotEmpty()) {
+            val request = ImageRequest.Builder(context)
+                .data(imageToLoad)
+                .allowHardware(false) // Imprescindible para el mapa de Google
+                .build()
+            val result = context.imageLoader.execute(request)
+            if (result is SuccessResult) {
+                val bitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                if (bitmap != null) {
+                    imageBitmap = bitmap.asImageBitmap()
+                }
+            }
+        }
+    }
+
+    val markerState = rememberMarkerState(position = LatLng(venue.location.latitude, venue.location.longitude))
+    MarkerComposable(
+        state = markerState,
+        title = venue.name,
+        keys = arrayOf(venue.id, imageBitmap ?: "loading"),
+        onClick = { 
+            onVenueClick(venue)
+            scope.launch {
+                cameraPositionState.animate(
+                    CameraUpdateFactory.newLatLngZoom(LatLng(venue.location.latitude, venue.location.longitude), 16f), 1000
+                )
+            }
+            true 
+        }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+                .border(2.dp, NeonPurple, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (imageBitmap != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = imageBitmap!!,
+                    contentDescription = venue.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
+            } else {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = NeonPink,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }
