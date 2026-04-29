@@ -39,15 +39,23 @@ import kotlin.math.abs
 @Composable
 fun MainScreen(
     rootNavController: NavHostController,
-    viewModel: MainViewModel = hiltViewModel()
+    viewModel: MainViewModel = hiltViewModel(),
+    initialTab: Int = 0
 ) {
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
+    val pagerState = rememberPagerState(initialPage = initialTab, pageCount = { 4 })
     val scope = rememberCoroutineScope()
     var selectedVenue by remember { mutableStateOf<Venue?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
     
     val unreadNotifications by viewModel.unreadNotificationsCount.collectAsState()
     val hasUnread = unreadNotifications > 0
+
+    // Sincronizar el pager si cambia la pestaña inicial (p. ej. al venir de una historia)
+    LaunchedEffect(initialTab) {
+        if (pagerState.currentPage != initialTab) {
+            pagerState.scrollToPage(initialTab)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -76,8 +84,15 @@ fun MainScreen(
                                 if (hasUnread) {
                                     Badge(
                                         containerColor = NeonPink,
-                                        modifier = Modifier.size(8.dp).offset(x = (-4).dp, y = 4.dp)
-                                    )
+                                        contentColor = Color.White,
+                                        modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = if (unreadNotifications > 99) "99+" else unreadNotifications.toString(),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         ) {

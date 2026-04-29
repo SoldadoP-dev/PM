@@ -39,7 +39,6 @@ class HomeViewModel @Inject constructor(
     private val _isUploadingStory = MutableStateFlow(false)
     val isUploadingStory: StateFlow<Boolean> = _isUploadingStory
 
-    // Estado para saber qué historias han sido vistas
     private val _seenStories = MutableStateFlow<Set<String>>(emptySet())
     val seenStories: StateFlow<Set<String>> = _seenStories
 
@@ -82,10 +81,10 @@ class HomeViewModel @Inject constructor(
             repository.getCurrentUserFlow().collectLatest { user ->
                 _currentUser.value = user
                 if (user != null) {
-                    val following = user.followingUids
-                    repository.getStories(following).collect { allStories ->
+                    // Cargamos historias propias Y de seguidos
+                    val allUids = (listOf(user.uid) + user.followingUids).distinct()
+                    repository.getStories(allUids).collect { allStories ->
                         _stories.value = allStories
-                        // Marcamos como vistas aquellas donde nuestro UID está en seenBy
                         val seenIds = allStories.filter { it.seenBy.contains(user.uid) }.map { it.id }.toSet()
                         _seenStories.value = seenIds
                     }

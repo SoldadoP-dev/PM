@@ -22,9 +22,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.pm.ui.screens.*
 import com.example.pm.ui.theme.PMTheme
 import com.google.firebase.auth.FirebaseAuth
@@ -195,7 +197,19 @@ fun AppNavigation(navController: NavHostController, auth: FirebaseAuth) {
     ) {
         composable("login") { LoginScreen(navController) }
         composable("register") { RegisterScreen(navController) }
-        composable("main") { MainScreen(navController) }
+        
+        // Ruta única para main con parámetro opcional de pestaña
+        composable(
+            route = "main?tab={tab}",
+            arguments = listOf(navArgument("tab") { 
+                type = NavType.StringType
+                defaultValue = "0" 
+            })
+        ) { backStackEntry ->
+            val tab = backStackEntry.arguments?.getString("tab")?.toIntOrNull() ?: 0
+            MainScreen(navController, initialTab = tab)
+        }
+
         composable("notifications") { NotificationsScreen(navController) }
         
         composable("userList/{type}/{userId}") { backStackEntry ->

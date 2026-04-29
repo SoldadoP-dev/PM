@@ -96,6 +96,9 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
     }
 
     val groupedStories = stories.groupBy { it.userId }
+    
+    // ORDEN ESTABLE: Mis seguidos en el orden en que están guardados
+    val friendIds = currentUser?.followingUids?.filter { groupedStories.containsKey(it) } ?: emptyList()
 
     LazyRow(
         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
@@ -151,7 +154,7 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
             }
         }
         
-        items(groupedStories.keys.toList().filter { it != currentUser?.uid }) { userId ->
+        items(friendIds) { userId ->
             val userStories = groupedStories[userId] ?: emptyList()
             if (userStories.isNotEmpty()) {
                 val firstStory = userStories.first()
@@ -182,8 +185,6 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
         }
     }
 }
-
-
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -228,7 +229,7 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
     }
     
     val mapStyleJson = if (isDarkMap) {
-        """[{"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#ffffff"}]},{"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#000000"},{"lightness":13}]},{"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#144b53"},{"lightness":14},{"weight":1.4}]},{"featureType":"landscape","elementType":"all","stylers":[{"color":"#08304b"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#0c4152"},{"lightness":5}]},{"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#0b434f"},{"lightness":25}]},{"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#0b3d51"},{"lightness":16}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"}]},{"featureType":"transit","elementType":"all","stylers":[{"color":"#146474"}]},{"featureType":"water","elementType":"all","stylers":[{"color":"#021019"}]}]"""
+        """[{"featureType":"all","elementType":"labels.text.fill","stylers":[{"color":"#ffffff"}]},{"featureType":"all","elementType":"labels.text.stroke","stylers":[{"color":"#000000"},{"lightness":13}]},{"featureType":"administrative","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#144b53"},{"lightness":14},{"weight":14}]},{"featureType":"landscape","elementType":"all","stylers":[{"color":"#08304b"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#0c4152"},{"lightness":5}]},{"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#0b434f"},{"lightness":25}]},{"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#000000"}]},{"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#0b3d51"},{"lightness":16}]},{"featureType":"road.local","elementType":"geometry","stylers":[{"color":"#000000"}]},{"featureType":"transit","elementType":"all","stylers":[{"color":"#146474"}]},{"featureType":"water","elementType":"all","stylers":[{"color":"#021019"}]}]"""
     } else null
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -268,7 +269,6 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
             }
         }
 
-        // Buscador coherente con ExploreScreen (40dp de altura, 10dp de radio)
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -344,7 +344,7 @@ fun VenueMarker(
         if (imageToLoad.isNotEmpty()) {
             val request = ImageRequest.Builder(context)
                 .data(imageToLoad)
-                .allowHardware(false) // Imprescindible para el mapa de Google
+                .allowHardware(false)
                 .build()
             val result = context.imageLoader.execute(request)
             if (result is SuccessResult) {
@@ -397,4 +397,3 @@ fun VenueMarker(
         }
     }
 }
-

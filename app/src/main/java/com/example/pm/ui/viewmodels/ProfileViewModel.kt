@@ -39,6 +39,10 @@ class ProfileViewModel @Inject constructor(
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading
 
+    // Estado local para peticiones enviadas (UI Reactiva)
+    private val _sentRequests = MutableStateFlow<Set<String>>(emptySet())
+    val sentRequests: StateFlow<Set<String>> = _sentRequests
+
     val hasActiveStories: Flow<Boolean> = _user.flatMapLatest { user ->
         if (user == null) flowOf(false)
         else repository.getStoriesByUser(user.uid).map { it.isNotEmpty() }
@@ -143,6 +147,10 @@ class ProfileViewModel @Inject constructor(
     fun followUser(targetUserId: String) {
         viewModelScope.launch {
             val currentUser = repository.getCurrentUser() ?: return@launch
+            
+            // Actualización reactiva instantánea en la UI
+            _sentRequests.value = _sentRequests.value + targetUserId
+            
             // Enviar solicitud de seguimiento
             firestore.collection("users").document(targetUserId)
                 .update("pendingFollowRequests", com.google.firebase.firestore.FieldValue.arrayUnion(currentUser.uid))
@@ -155,6 +163,9 @@ class ProfileViewModel @Inject constructor(
                 type = "follow_request",
                 content = "${currentUser.username} quiere seguirte"
             ))
+            
+            // NOTA: No borramos al usuario de recomendaciones aquí.
+            // Se mantendrá en la lista como "Pendiente" hasta que el usuario navegue o recargue.
         }
     }
 
@@ -194,6 +205,29 @@ class ProfileViewModel @Inject constructor(
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.localizedMessage ?: "Error desconocido")
+            }
+        }
+    }
+
+    fun deleteAccount(password: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val user = auth.currentUser ?: throw Exception("No hay usuario autenticado")
+                val email = user.email ?: throw Exception("El usuario no tiene email")
+                
+                // Re-autenticar
+                val credential = EmailAuthProvider.getCredential(email, password)
+                user.reauthenticate(credential).await()
+                
+                // Eliminar de Firestore primero
+                val uid = user.uid
+                firestore.collection("users").document(uid).delete().await()
+                
+                // Eliminar usuario de Auth
+                user.delete().await()
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.localizedMessage ?: "Error al borrar la cuenta")
             }
         }
     }

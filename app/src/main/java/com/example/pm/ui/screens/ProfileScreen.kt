@@ -59,6 +59,7 @@ fun ProfileScreen(
     val recommendedUsers by viewModel.recommendedUsers.collectAsState()
     val hasStories by viewModel.hasActiveStories.collectAsState(initial = false)
     val isUploading by viewModel.isUploading.collectAsState()
+    val sentRequests by viewModel.sentRequests.collectAsState()
     
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -265,6 +266,7 @@ fun ProfileScreen(
                                         SuggestedUserCard(
                                             user = recUser, 
                                             mutualCount = mutualCount,
+                                            isSent = sentRequests.contains(recUser.uid) || recUser.pendingFollowRequests.contains(user?.uid),
                                             onRemoveClick = { viewModel.removeRecommendedUser(recUser.uid) },
                                             onFollowClick = { viewModel.followUser(recUser.uid) },
                                             onUserClick = { rootNavController.navigate("otherProfile/${recUser.uid}") }
@@ -401,6 +403,7 @@ fun ProfileEmptyState(text: String, launcher: androidx.activity.result.ActivityR
 fun SuggestedUserCard(
     user: User, 
     mutualCount: Int,
+    isSent: Boolean = false,
     onRemoveClick: () -> Unit, 
     onFollowClick: () -> Unit,
     onUserClick: () -> Unit
@@ -452,13 +455,20 @@ fun SuggestedUserCard(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = onFollowClick,
+                    onClick = { if (!isSent) onFollowClick() },
                     modifier = Modifier.fillMaxWidth().height(28.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF833AB4)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSent) Color(0xFF262626) else Color(0xFF833AB4)
+                    ),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(0.dp)
                 ) {
-                    Text("Seguir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(
+                        if (isSent) "Solicitado" else "Seguir", 
+                        color = if (isSent) Color.Gray else Color.White, 
+                        fontWeight = FontWeight.Bold, 
+                        fontSize = 12.sp
+                    )
                 }
             }
         }

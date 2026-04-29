@@ -22,30 +22,36 @@ class StoryViewModel @Inject constructor(
     private val _orderedUserIds = MutableStateFlow<List<String>>(emptyList())
     val orderedUserIds: StateFlow<List<String>> = _orderedUserIds
 
+    val currentUserId: String? get() = auth.currentUser?.uid
+
+    private var hasInitialized = false
+
     fun loadAllStories(startUserId: String) {
+        if (hasInitialized) return
+
         viewModelScope.launch {
             val currentUser = repository.getCurrentUser() ?: return@launch
             val followingUids = currentUser.followingUids
             
-            // Si empezamos por nuestra propia historia, incluimos a los seguidos después.
-            // Si empezamos por la de un amigo, SOLO cargamos historias de amigos (sin la nuestra al final).
-            val allTargetUids = if (startUserId == currentUser.uid) {
-                (listOf(currentUser.uid) + followingUids).distinct()
-            } else {
-                followingUids.filter { it != currentUser.uid }
-            }
+            val allTargetUids = (listOf(currentUser.uid) + followingUids).distinct()
 
             repository.getStories(allTargetUids).collect { allStories ->
-                val grouped = storiesToUserMap(allStories)
+                val grouped = allStories.groupBy { it.userId }
+                    .mapValues { entry -> entry.value.sortedBy { it.expiresAt } }
                 _userStoriesMap.value = grouped
                 
-                // Ordenamos: el startUserId siempre va primero, luego el resto
-                val ids = grouped.keys.toMutableList()
-                if (ids.contains(startUserId)) {
-                    ids.remove(startUserId)
-                    ids.add(0, startUserId)
+                if (!hasInitialized) {
+                    // ORDEN LINEAL ESTRICTO: Yo -> Amigos en orden de siguiendo
+                    val masterList = (listOf(currentUser.uid) + followingUids)
+                        .filter { grouped.containsKey(it) }
+
+                    val startIndex = masterList.indexOf(startUserId)
+                    if (startIndex != -1) {
+                        // Lista desde el pulsado hasta el final
+                        _orderedUserIds.value = masterList.subList(startIndex, masterList.size)
+                        hasInitialized = true
+                    }
                 }
-                _orderedUserIds.value = ids
             }
         }
     }
@@ -54,10 +60,5 @@ class StoryViewModel @Inject constructor(
         viewModelScope.launch {
             repository.markStoryAsSeen(storyId)
         }
-    }
-
-    private fun storiesToUserMap(stories: List<Story>): Map<String, List<Story>> {
-        return stories.groupBy { it.userId }
-            .mapValues { entry -> entry.value.sortedBy { it.expiresAt } }
     }
 }

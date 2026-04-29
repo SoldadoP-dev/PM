@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,46 +33,66 @@ import kotlinx.coroutines.delay
 fun VideoPlayer(
     videoUrl: String,
     modifier: Modifier = Modifier,
-    autoPlay: Boolean = true,
+    isPlaying: Boolean = true,
+    showControlsOnTap: Boolean = true,
     onToggleControls: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
-    var isPlaying by remember { mutableStateOf(autoPlay) }
+    var isActuallyPlaying by remember { mutableStateOf(isPlaying) }
     var showControls by remember { mutableStateOf(false) }
+    var isBuffering by remember { mutableStateOf(true) }
 
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(videoUrl))
-            prepare()
-            playWhenReady = autoPlay
-            repeatMode = ExoPlayer.REPEAT_MODE_ONE
-            addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(playing: Boolean) {
-                    isPlaying = playing
-                }
-            })
-        }
+        ExoPlayer.Builder(context)
+            .setLoadControl(
+                androidx.media3.exoplayer.DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        250,  // Min buffer para empezar
+                        1000, // Max buffer
+                        100,  // Playback start buffer
+                        100   // Rebuffer
+                    )
+                    .setPrioritizeTimeOverSizeThresholds(true)
+                    .build()
+            )
+            .build().apply {
+                repeatMode = ExoPlayer.REPEAT_MODE_ONE
+                addListener(object : Player.Listener {
+                    override fun onIsPlayingChanged(playing: Boolean) {
+                        isActuallyPlaying = playing
+                    }
+                    override fun onPlaybackStateChanged(state: Int) {
+                        isBuffering = state == Player.STATE_BUFFERING
+                    }
+                })
+            }
     }
 
-    // Ocultar controles automáticamente después de unos segundos
-    LaunchedEffect(showControls) {
-        if (showControls) {
-            delay(3000)
-            showControls = false
-            onToggleControls(false)
-        }
+    // Usamos el id del videoUrl para re-preparar si cambia, pero manteniendo el reproductor
+    LaunchedEffect(videoUrl) {
+        val mediaItem = MediaItem.fromUri(videoUrl)
+        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.prepare()
+        exoPlayer.playWhenReady = isPlaying
+    }
+
+    LaunchedEffect(isPlaying) {
+        exoPlayer.playWhenReady = isPlaying
     }
 
     Box(
         modifier = modifier
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = {
-                        showControls = !showControls
-                        onToggleControls(showControls)
+            .background(Color.Black)
+            .then(
+                if (showControlsOnTap) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(onTap = {
+                            showControls = !showControls
+                            onToggleControls(showControls)
+                        })
                     }
-                )
-            }
+                } else Modifier
+            )
     ) {
         AndroidView(
             factory = {
@@ -79,12 +100,24 @@ fun VideoPlayer(
                     player = exoPlayer
                     useController = false
                     resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    setBackgroundColor(android.graphics.Color.BLACK)
+                    setShutterBackgroundColor(android.graphics.Color.BLACK)
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            update = {
+                it.player = exoPlayer
+            }
         )
 
-        // Capa de Controles (Play/Pause)
+        if (isBuffering && isPlaying) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center).size(40.dp),
+                color = Color.White.copy(alpha = 0.5f),
+                strokeWidth = 2.dp
+            )
+        }
+
         AnimatedVisibility(
             visible = showControls,
             enter = fadeIn(),
@@ -94,15 +127,14 @@ fun VideoPlayer(
             Box(
                 modifier = Modifier
                     .size(64.dp)
-                    .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-                    .padding(8.dp),
+                    .background(Color.Black.copy(alpha = 0.4f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 androidx.compose.material3.IconButton(onClick = {
-                    if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                    if (isActuallyPlaying) exoPlayer.pause() else exoPlayer.play()
                 }) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        imageVector = if (isActuallyPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(40.dp)

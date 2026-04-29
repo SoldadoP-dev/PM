@@ -32,6 +32,7 @@ fun DiscoverPeopleScreen(
     val recommendedUsers by viewModel.recommendedUsers.collectAsState()
     val pendingRequests by viewModel.pendingRequests.collectAsState()
     val currentUser by viewModel.user.collectAsState()
+    val sentRequests by viewModel.sentRequests.collectAsState()
 
     Scaffold(
         topBar = {
@@ -55,11 +56,13 @@ fun DiscoverPeopleScreen(
             // Sugerencias
             items(recommendedUsers) { user ->
                 val mutualCount = currentUser?.followingUids?.intersect(user.followingUids.toSet())?.size ?: 0
-                val isPending = user.pendingFollowRequests.contains(currentUser?.uid ?: "")
+                val isSentLocally = sentRequests.contains(user.uid)
+                val isPendingInDb = user.pendingFollowRequests.contains(currentUser?.uid ?: "")
+                
                 DiscoverUserItem(
                     user = user,
                     mutualCount = mutualCount,
-                    isPending = isPending,
+                    isPending = isSentLocally || isPendingInDb,
                     onFollowClick = { viewModel.followUser(user.uid) },
                     onRemoveClick = { viewModel.removeRecommendedUser(user.uid) },
                     onUserClick = { navController.navigate("otherProfile/${user.uid}") }
@@ -77,13 +80,6 @@ fun DiscoverPeopleScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Solicitudes de seguimiento", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(
-                            "Ver todo", 
-                            color = Color(0xFF833AB4),
-                            fontSize = 14.sp, 
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable { /* Navegar a solicitudes si hubiera otra pantalla */ }
-                        )
                     }
                 }
 
@@ -142,7 +138,7 @@ fun DiscoverUserItem(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
             modifier = Modifier.height(32.dp)
         ) {
-            Text(if (isPending) "Pendiente" else "Seguir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(if (isPending) "Solicitado" else "Seguir", color = if (isPending) Color.Gray else Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
         IconButton(onClick = onRemoveClick) {
             Icon(Icons.Default.Close, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
