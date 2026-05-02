@@ -33,22 +33,40 @@ class OtherProfileViewModel @Inject constructor(
 
     fun loadProfile(userId: String) {
         val currentUid = auth.currentUser?.uid ?: return
+        
+        // Escuchar datos del usuario visitado
         viewModelScope.launch {
-            // Escuchar cambios en tiempo real del usuario visitado a través del repositorio
             repository.getUserFlow(userId).collect {
                 _user.value = it
             }
         }
+        
+        // Escuchar datos del usuario actual
         viewModelScope.launch {
-            // Escuchar cambios en tiempo real del usuario actual a través del repositorio
             repository.getUserFlow(currentUid).collect {
                 _currentUser.value = it
             }
         }
+
+        // Lógica de privacidad: Combinar el estado del usuario con sus posts
         viewModelScope.launch {
-            // Cargar posts
-            repository.getUserPosts(userId).collect {
-                _posts.value = it
+            combine(
+                repository.getUserFlow(userId),
+                repository.getUserPosts(userId)
+            ) { targetUser, userPosts ->
+                if (targetUser == null) return@combine emptyList<Post>()
+                
+                val isFollowing = targetUser.followerUids.contains(currentUid)
+                val isOwner = userId == currentUid
+                
+                // Si es privado y no soy seguidor ni el dueño, ocultamos los posts
+                if (targetUser.isPrivate && !isFollowing && !isOwner) {
+                    emptyList()
+                } else {
+                    userPosts
+                }
+            }.collect { filteredPosts ->
+                _posts.value = filteredPosts
             }
         }
     }

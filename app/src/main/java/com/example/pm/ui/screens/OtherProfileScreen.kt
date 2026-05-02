@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +23,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,6 +57,8 @@ fun OtherProfileScreen(
 
     val isFollowing = currentUser?.followingUids?.contains(userId) == true
     val isPending = user?.pendingFollowRequests?.contains(currentUser?.uid ?: "") == true
+    val isPrivate = user?.isPrivate ?: false
+    val canSeeContent = !isPrivate || isFollowing || userId == currentUser?.uid
 
     if (isPending) isOptimisticRequested = false
 
@@ -81,7 +85,6 @@ fun OtherProfileScreen(
                 ) {
                     item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
                         Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            // Avatar con indicador de conexión funcional
                             UserAvatar(
                                 url = user?.photoUrl, 
                                 username = user?.username ?: "", 
@@ -94,7 +97,7 @@ fun OtherProfileScreen(
                             Text(user?.username ?: "", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
                             
                             Row(modifier = Modifier.padding(vertical = 24.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                ProfileStat(posts.size.toString(), stringResource(R.string.posts)) {}
+                                ProfileStat(if (canSeeContent) posts.size.toString() else "-", stringResource(R.string.posts)) {}
                                 ProfileStat(user?.followersCount?.toString() ?: "0", stringResource(R.string.followers)) {}
                                 ProfileStat(user?.followingCount?.toString() ?: "0", stringResource(R.string.following)) {}
                             }
@@ -145,25 +148,56 @@ fun OtherProfileScreen(
                         }
                     }
 
-                    items(posts, key = { it.id }) { post ->
-                        Box(modifier = Modifier.aspectRatio(1f).clickable { 
-                            navController.navigate("postDetail/${post.id}")
-                        }) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(post.imageUrl ?: post.videoUrl)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                            if (post.videoUrl != null) {
+                    if (canSeeContent) {
+                        items(posts, key = { it.id }) { post ->
+                            Box(modifier = Modifier.aspectRatio(1f).clickable { 
+                                navController.navigate("postDetail/${post.id}")
+                            }) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(post.imageUrl ?: post.videoUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                if (post.videoUrl != null) {
+                                    Icon(
+                                        Icons.Default.PlayCircle,
+                                        null,
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp),
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 64.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
                                 Icon(
-                                    Icons.Default.PlayCircle,
-                                    null,
-                                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(20.dp),
-                                    tint = Color.White
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = Color.Gray
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "Esta cuenta es privada",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                                Text(
+                                    "Síguela para ver sus fotos y vídeos.",
+                                    color = Color.Gray,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 32.dp)
                                 )
                             }
                         }

@@ -181,6 +181,7 @@ class ProfileViewModel @Inject constructor(
         newImageUri: Uri?,
         currentPassword: String,
         newPassword: String,
+        isPrivate: Boolean,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -201,7 +202,7 @@ class ProfileViewModel @Inject constructor(
                 } else {
                     _user.value?.photoUrl ?: ""
                 }
-                repository.updateUser(newUsername, newBio, photoUrl)
+                repository.updateUser(newUsername, newBio, photoUrl, isPrivate)
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.localizedMessage ?: "Error desconocido")

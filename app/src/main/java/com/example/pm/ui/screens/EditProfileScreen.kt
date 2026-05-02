@@ -47,6 +47,7 @@ fun EditProfileScreen(
 
     var username by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf("") }
+    var isPrivate by remember { mutableStateOf(false) }
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -57,6 +58,7 @@ fun EditProfileScreen(
         user?.let {
             username = it.username
             bio = it.bio
+            isPrivate = it.isPrivate
         }
     }
 
@@ -156,6 +158,40 @@ fun EditProfileScreen(
             )
 
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Opción de Cuenta Privada
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Cuenta Privada", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Solo tus seguidores podrán ver tus publicaciones",
+                            color = Color.Gray,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Switch(
+                        checked = isPrivate,
+                        onCheckedChange = { isPrivate = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF833AB4),
+                            checkedTrackColor = Color(0xFF833AB4).copy(alpha = 0.5f)
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
             
             // DESPLEGABLE DE CONTRASEÑA
             Card(
@@ -223,6 +259,7 @@ fun EditProfileScreen(
                         newImageUri = selectedImageUri,
                         currentPassword = currentPassword,
                         newPassword = newPassword,
+                        isPrivate = isPrivate,
                         onSuccess = {
                             isSaving = false
                             Toast.makeText(context, "Perfil actualizado", Toast.LENGTH_SHORT).show()

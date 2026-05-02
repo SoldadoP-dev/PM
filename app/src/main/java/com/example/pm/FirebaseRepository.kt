@@ -55,13 +55,24 @@ class FirebaseRepository @Inject constructor(
         return firestore.collection("users").get().await().toObjects(User::class.java)
     }
 
-    suspend fun updateUser(username: String, bio: String, photoUrl: String) {
+    suspend fun updateUser(username: String, bio: String, photoUrl: String, isPrivate: Boolean) {
         val uid = auth.currentUser?.uid ?: return
         firestore.collection("users").document(uid).update(
             "username", username,
             "bio", bio,
-            "photoUrl", photoUrl
+            "photoUrl", photoUrl,
+            "isPrivate", isPrivate
         ).await()
+
+        // Actualizar la privacidad de todos los posts existentes del usuario usando un Batch
+        val postsQuery = firestore.collection("posts").whereEqualTo("userId", uid).get().await()
+        if (!postsQuery.isEmpty) {
+            val batch = firestore.batch()
+            for (doc in postsQuery.documents) {
+                batch.update(doc.reference, "isPrivate", isPrivate)
+            }
+            batch.commit().await()
+        }
     }
 
     suspend fun updateGhostMode(enabled: Boolean) {
@@ -513,7 +524,8 @@ class FirebaseRepository @Inject constructor(
             imageUrl = imageUrl,
             videoUrl = videoUrl,
             caption = caption,
-            timestamp = Timestamp.now()
+            timestamp = Timestamp.now(),
+            isPrivate = user.isPrivate
         )
         firestore.collection("posts").add(post).await()
     }
@@ -633,6 +645,7 @@ class FirebaseRepository @Inject constructor(
 
     fun getGlobalPosts(): Flow<List<Post>> = callbackFlow {
         val listener = firestore.collection("posts")
+            .whereEqualTo("isPrivate", false)
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) return@addSnapshotListener

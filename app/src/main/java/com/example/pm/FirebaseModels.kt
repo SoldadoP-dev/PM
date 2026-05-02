@@ -21,7 +21,8 @@ data class User(
     val hiddenUids: List<String> = emptyList(),
     val fcmToken: String? = null,
     @get:PropertyName("isOnline") @set:PropertyName("isOnline") var isOnline: Boolean = false,
-    val ghostMode: Boolean = false
+    val ghostMode: Boolean = false,
+    @get:PropertyName("isPrivate") @set:PropertyName("isPrivate") var isPrivate: Boolean = false
 )
 
 /**
@@ -147,7 +148,8 @@ data class Post(
     val caption: String = "",
     val timestamp: Timestamp = Timestamp.now(),
     val likesCount: Int = 0,
-    val likedBy: List<String> = emptyList()
+    val likedBy: List<String> = emptyList(),
+    @get:PropertyName("isPrivate") @set:PropertyName("isPrivate") var isPrivate: Boolean = false
 )
 
 /**
