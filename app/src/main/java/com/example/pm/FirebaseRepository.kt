@@ -75,6 +75,7 @@ class FirebaseRepository @Inject constructor(
     }
 
     suspend fun getOtherUser(userId: String): User? {
+        if (userId == "group") return null
         return firestore.collection("users").document(userId).get().await().toObject(User::class.java)
     }
 
@@ -84,6 +85,7 @@ class FirebaseRepository @Inject constructor(
         
         val existing = firestore.collection("chats")
             .whereEqualTo("participants", participants)
+            .whereEqualTo("isGroup", false)
             .get()
             .await()
 
@@ -307,6 +309,8 @@ class FirebaseRepository @Inject constructor(
 
         val message = Message(
             senderId = uid,
+            senderName = user.username,
+            senderPhotoUrl = user.photoUrl,
             text = text,
             imageUrl = imageUrl,
             videoUrl = videoUrl,
@@ -326,18 +330,21 @@ class FirebaseRepository @Inject constructor(
         ).await()
 
         val chatDoc = firestore.collection("chats").document(chatId).get().await()
-        val participants = chatDoc.get("participants") as? List<String> ?: emptyList()
-        val otherId = participants.find { it != uid }
-        if (otherId != null) {
-            sendNotification(ActivityNotification(
-                fromUserId = uid,
-                fromUsername = user.username,
-                toUserId = otherId,
-                type = "message",
-                content = lastMsg,
-                targetId = chatId,
-                isRead = false
-            ))
+        val isGroup = chatDoc.getBoolean("isGroup") ?: false
+        if (!isGroup) {
+            val participants = chatDoc.get("participants") as? List<String> ?: emptyList()
+            val otherId = participants.find { it != uid }
+            if (otherId != null) {
+                sendNotification(ActivityNotification(
+                    fromUserId = uid,
+                    fromUsername = user.username,
+                    toUserId = otherId,
+                    type = "message",
+                    content = lastMsg,
+                    targetId = chatId,
+                    isRead = false
+                ))
+            }
         }
     }
 
@@ -362,6 +369,81 @@ class FirebaseRepository @Inject constructor(
                 trySend(snapshot?.toObject(ChatRoom::class.java))
             }
         awaitClose { listener.remove() }
+    }
+
+    suspend fun createMeetup(name: String, invitedUids: List<String>, photoUri: Uri? = null) {
+        val currentUser = getCurrentUser() ?: return
+        val meetupRef = firestore.collection("meetups").document()
+        val photoUrl = photoUri?.let { uploadFile(it, "meetup_pics") }
+
+        val chatRoom = ChatRoom(
+            participants = listOf(currentUser.uid),
+            isGroup = true,
+            name = name,
+            photoUrl = photoUrl,
+            meetupId = meetupRef.id
+        )
+        val chatRef = firestore.collection("chats").add(chatRoom).await()
+
+        val meetup = Meetup(
+            id = meetupRef.id,
+            creatorId = currentUser.uid,
+            name = name,
+            photoUrl = photoUrl,
+            invitedUids = invitedUids,
+            acceptedUids = listOf(currentUser.uid),
+            timestamp = Timestamp.now(),
+            chatId = chatRef.id
+        )
+        meetupRef.set(meetup).await()
+
+        invitedUids.forEach { invitedUid ->
+            sendNotification(ActivityNotification(
+                fromUserId = currentUser.uid,
+                fromUsername = currentUser.username,
+                toUserId = invitedUid,
+                type = "meetup_invitation",
+                content = "Te ha invitado a la quedada: $name",
+                targetId = meetupRef.id
+            ))
+        }
+    }
+
+    suspend fun respondToMeetup(meetupId: String, accept: Boolean) {
+        val currentUser = getCurrentUser() ?: return
+        val meetupRef = firestore.collection("meetups").document(meetupId)
+        val meetup = meetupRef.get().await().toObject(Meetup::class.java) ?: return
+
+        if (accept) {
+            meetupRef.update("acceptedUids", FieldValue.arrayUnion(currentUser.uid)).await()
+            if (meetup.chatId.isNotEmpty()) {
+                firestore.collection("chats").document(meetup.chatId)
+                    .update("participants", FieldValue.arrayUnion(currentUser.uid)).await()
+            }
+        } else {
+            meetupRef.update("invitedUids", FieldValue.arrayRemove(currentUser.uid)).await()
+        }
+    }
+
+    suspend fun leaveGroup(chatId: String) {
+        val user = getCurrentUser() ?: return
+        val uid = user.uid
+        val chatRef = firestore.collection("chats").document(chatId)
+        
+        chatRef.update(
+            "participants", FieldValue.arrayRemove(uid),
+            "deletedTimestamps.$uid", Timestamp.now()
+        ).await()
+
+        // Send system message
+        val message = Message(
+            senderId = "system",
+            senderName = "Sistema",
+            text = "${user.username} ha abandonado el grupo",
+            timestamp = Timestamp.now()
+        )
+        chatRef.collection("messages").add(message).await()
+        chatRef.update("lastMessage", "${user.username} salió", "lastTimestamp", Timestamp.now())
     }
 
     suspend fun sendNotification(notification: ActivityNotification) {
@@ -575,5 +657,16 @@ class FirebaseRepository @Inject constructor(
                 trySend(snapshot?.toObjects(Attendance::class.java) ?: emptyList())
             }
         awaitClose { listener.remove() }
+    }
+
+    suspend fun getFollowers(userId: String): List<User> {
+        val user = firestore.collection("users").document(userId).get().await().toObject(User::class.java)
+        val followers = mutableListOf<User>()
+        user?.followerUids?.forEach { uid ->
+            firestore.collection("users").document(uid).get().await().toObject(User::class.java)?.let {
+                followers.add(it)
+            }
+        }
+        return followers
     }
 }

@@ -18,16 +18,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -37,11 +38,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
 import com.example.pm.ChatRoom
 import com.example.pm.User
 import com.example.pm.ui.components.UserAvatar
 import com.example.pm.ui.theme.InstaGradient
 import com.example.pm.ui.theme.NeonPink
+import com.example.pm.ui.theme.NeonPurple
 import com.example.pm.ui.viewmodels.MessagesViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,7 +100,7 @@ fun MessagesListScreen(
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            // Cabecera compacta - Título centrado sin flechas laterales
+            // Cabecera compacta
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -141,20 +144,18 @@ fun MessagesListScreen(
                 }
             }
 
-            // Carrusel de Historias Dinámico
+            // Carrusel de Historias
             LazyRow(
                 modifier = Modifier.padding(vertical = 8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // TU HISTORIA
                 item {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.width(75.dp)
                     ) {
                         Box(contentAlignment = Alignment.BottomEnd) {
-                            // Aura de Historia: Gris si ya se han visto todas
                             val hasUnseen = user?.uid in unseenStoriesUserIds
                             val auraBrush = when {
                                 hasUnseen -> InstaGradient
@@ -183,25 +184,23 @@ fun MessagesListScreen(
                                 )
                             }
 
-                            // Botón Añadir
                             Box(
                                 modifier = Modifier
                                     .size(20.dp)
-                                    .background(Color(0xFF833AB4), CircleShape)
+                                    .background(NeonPurple, CircleShape)
                                     .border(2.dp, Color.Black, CircleShape)
                                     .clickable { 
                                         storyLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(14.dp))
                             }
                         }
                         Text("Tu historia", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
 
-                // Historias de seguidos reales
                 val usersWithActualStories = followingUsers.filter { usersWithStories.contains(it.uid) }
                 
                 items(usersWithActualStories) { followedUser ->
@@ -250,7 +249,7 @@ fun MessagesListScreen(
                 Text("Mensajes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(
                     text = "Solicitudes", 
-                    color = Color(0xFF833AB4),
+                    color = NeonPurple,
                     fontWeight = FontWeight.Bold, 
                     fontSize = 14.sp,
                     modifier = Modifier.clickable { rootNavController.navigate("notifications") }
@@ -266,7 +265,6 @@ fun MessagesListScreen(
             }
         }
 
-        // ANIMACIÓN DE PUBLICANDO
         AnimatedVisibility(
             visible = isUploading,
             enter = fadeIn() + slideInVertically(),
@@ -285,7 +283,7 @@ fun MessagesListScreen(
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = Color(0xFF0095F6),
+                        color = NeonPurple,
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(16.dp))
@@ -306,68 +304,116 @@ fun EnrichedChatItemWithFilter(
     searchQuery: String,
     onLongClick: () -> Unit
 ) {
-    val otherId = chat.participants.find { it != currentUserId } ?: ""
     var otherUser by remember { mutableStateOf<User?>(null) }
     var unreadCount by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(otherId) {
-        viewModel.getOtherUserInfoFull(otherId) { user ->
-            otherUser = user
-        }
-    }
-
-    LaunchedEffect(chat.id) {
-        viewModel.getUnreadCount(chat.id).collect {
-            unreadCount = it
-        }
-    }
-
-    val otherName = otherUser?.username ?: "..."
-
-    if (searchQuery.isEmpty() || otherName.contains(searchQuery, ignoreCase = true)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = {
-                        val encodedName = Uri.encode(otherName)
-                        rootNavController.navigate("chat/${chat.id}/$encodedName/$otherId")
-                    },
-                    onLongClick = onLongClick
-                )
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // INDICADOR ONLINE EN LA IMAGEN DE PERFIL DEL CHAT - Aquí sí debe estar
-            UserAvatar(
-                url = otherUser?.photoUrl, 
-                username = otherName, 
-                size = 56.dp, 
-                isOnline = otherUser?.isOnline ?: false, 
-                ghostMode = otherUser?.ghostMode ?: false,
-                showIndicator = true 
-            )
-            
-            Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                Text(otherName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                Text(
-                    chat.lastMessage, 
-                    color = if (unreadCount > 0) Color.White else Color.Gray, 
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.Normal
-                )
-            }
-            
-            if (unreadCount > 0) {
+    if (chat.isGroup) {
+        val groupName = chat.name ?: "Quedada"
+        if (searchQuery.isEmpty() || groupName.contains(searchQuery, ignoreCase = true)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = {
+                            val encodedName = Uri.encode(groupName)
+                            rootNavController.navigate("chat/${chat.id}/$encodedName/group")
+                        },
+                        onLongClick = onLongClick
+                    )
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(18.dp)
-                        .background(Color(0xFF833AB4), CircleShape),
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(NeonPurple),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(unreadCount.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    if (!chat.photoUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = chat.photoUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Text(groupName.take(1).uppercase(), color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    }
+                }
+                
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(groupName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(
+                        chat.lastMessage, 
+                        color = Color.Gray, 
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    } else {
+        val otherId = chat.participants.find { it != currentUserId } ?: ""
+        LaunchedEffect(otherId) {
+            viewModel.getOtherUserInfoFull(otherId) { user ->
+                otherUser = user
+            }
+        }
+
+        LaunchedEffect(chat.id) {
+            viewModel.getUnreadCount(chat.id).collect {
+                unreadCount = it
+            }
+        }
+
+        val otherName = otherUser?.username ?: "..."
+
+        if (searchQuery.isEmpty() || otherName.contains(searchQuery, ignoreCase = true)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = {
+                            val encodedName = Uri.encode(otherName)
+                            rootNavController.navigate("chat/${chat.id}/$encodedName/$otherId")
+                        },
+                        onLongClick = onLongClick
+                    )
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                UserAvatar(
+                    url = otherUser?.photoUrl, 
+                    username = otherName, 
+                    size = 56.dp, 
+                    isOnline = otherUser?.isOnline ?: false, 
+                    ghostMode = otherUser?.ghostMode ?: false,
+                    showIndicator = true 
+                )
+                
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(otherName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(
+                        chat.lastMessage, 
+                        color = if (unreadCount > 0) Color.White else Color.Gray, 
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+                
+                if (unreadCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .background(NeonPurple, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(unreadCount.toString(), color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

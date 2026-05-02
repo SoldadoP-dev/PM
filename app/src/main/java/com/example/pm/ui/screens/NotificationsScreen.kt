@@ -75,6 +75,7 @@ fun NotificationsScreen(
                     NotificationItem(
                         notif = notif,
                         onAccept = { viewModel.acceptFollowRequest(notif) },
+                        onDecline = { /* Opcional: implementar rechazo */ },
                         onClick = {
                             viewModel.markAsRead(notif.id)
                             navController.navigate("otherProfile/${notif.fromUserId}")
@@ -99,12 +100,14 @@ fun NotificationsScreen(
                 items(generalNotifs, key = { it.id }) { notif ->
                     NotificationItem(
                         notif = notif,
-                        onAccept = {},
+                        onAccept = { if (notif.type == "meetup_invitation") viewModel.respondToMeetup(notif, true) },
+                        onDecline = { if (notif.type == "meetup_invitation") viewModel.respondToMeetup(notif, false) },
                         onClick = {
                             viewModel.markAsRead(notif.id)
                             when(notif.type) {
                                 "like", "comment", "comment_like" -> navController.navigate("postDetail/${notif.targetId}")
                                 "message" -> navController.navigate("chat/${notif.targetId}/${notif.fromUsername}/${notif.fromUserId}")
+                                "meetup_invitation" -> { /* Ya se maneja con botones */ }
                             }
                         }
                     )
@@ -126,13 +129,18 @@ fun SectionHeader(title: String) {
 }
 
 @Composable
-fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick: () -> Unit) {
-    var isAcceptedLocal by rememberSaveable(notif.id) { mutableStateOf(false) }
+fun NotificationItem(
+    notif: ActivityNotification, 
+    onAccept: () -> Unit, 
+    onDecline: () -> Unit = {},
+    onClick: () -> Unit
+) {
+    var isProcessedLocal by rememberSaveable(notif.id) { mutableStateOf(false) }
     
     ListItem(
         modifier = Modifier
             .background(if (!notif.isRead) NeonPurple.copy(alpha = 0.05f) else Color.Transparent)
-            .clickable { onClick() },
+            .clickable { if (notif.type != "meetup_invitation") onClick() },
         headlineContent = { 
             Text(
                 text = when(notif.type) {
@@ -141,6 +149,7 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
                     "comment" -> "${notif.fromUsername} comentó tu post"
                     "comment_like" -> "A ${notif.fromUsername} le gusta tu respuesta"
                     "message" -> "${notif.fromUsername} te envió un mensaje"
+                    "meetup_invitation" -> "${notif.fromUsername} te invitó a una quedada"
                     else -> notif.fromUsername
                 },
                 fontWeight = if (!notif.isRead) FontWeight.ExtraBold else FontWeight.Normal, 
@@ -151,7 +160,7 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
         supportingContent = { 
             Text(
                 text = when(notif.type) {
-                    "comment", "message" -> notif.content
+                    "comment", "message", "meetup_invitation" -> notif.content
                     "like", "comment_like" -> "Toca para ver la publicación"
                     "follow_request" -> "Toca para ver el perfil"
                     else -> "Nueva actividad"
@@ -163,32 +172,33 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
         },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (notif.type == "follow_request") {
-                    val currentlyAccepted = isAcceptedLocal || notif.isRead
+                if (notif.type == "follow_request" || notif.type == "meetup_invitation") {
+                    val currentlyProcessed = isProcessedLocal || notif.isRead
                     
-                    Button(
-                        onClick = {
-                            isAcceptedLocal = true
-                            onAccept()
-                        }, 
-                        enabled = !currentlyAccepted,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (currentlyAccepted) Color.DarkGray else NeonPurple,
-                            disabledContainerColor = Color.DarkGray,
-                            disabledContentColor = Color.White
-                        ), 
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(32.dp).widthIn(min = 84.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            text = if (currentlyAccepted) stringResource(R.string.accepted) else stringResource(R.string.accept),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
+                    if (!currentlyProcessed) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            IconButton(
+                                onClick = {
+                                    isProcessedLocal = true
+                                    onDecline()
+                                },
+                                modifier = Modifier.size(32.dp).background(Color.DarkGray, CircleShape)
+                            ) {
+                                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(
+                                onClick = {
+                                    isProcessedLocal = true
+                                    onAccept()
+                                },
+                                modifier = Modifier.size(32.dp).background(NeonPurple, CircleShape)
+                            ) {
+                                Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                            }
+                        }
                     }
                 }
-                if (!notif.isRead) {
+                if (!notif.isRead && notif.type != "follow_request" && notif.type != "meetup_invitation") {
                     Box(modifier = Modifier.size(10.dp).background(NeonPink, CircleShape))
                 }
             }
@@ -206,6 +216,7 @@ fun NotificationItem(notif: ActivityNotification, onAccept: () -> Unit, onClick:
                         "comment" -> Icons.AutoMirrored.Filled.Comment
                         "message" -> Icons.AutoMirrored.Filled.Chat
                         "follow_request" -> Icons.Default.PersonAdd
+                        "meetup_invitation" -> Icons.Default.Groups
                         else -> Icons.Default.Notifications
                     },
                     contentDescription = null,

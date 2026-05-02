@@ -42,10 +42,14 @@ class HomeViewModel @Inject constructor(
     private val _seenStories = MutableStateFlow<Set<String>>(emptySet())
     val seenStories: StateFlow<Set<String>> = _seenStories
 
+    private val _followers = MutableStateFlow<List<User>>(emptyList())
+    val followers: StateFlow<List<User>> = _followers
+
     init {
         loadVenues()
         observeCurrentUserAndStories()
         loadGlobalPosts()
+        loadFollowers()
     }
 
     private fun loadVenues() {
@@ -81,7 +85,6 @@ class HomeViewModel @Inject constructor(
             repository.getCurrentUserFlow().collectLatest { user ->
                 _currentUser.value = user
                 if (user != null) {
-                    // Cargamos historias propias Y de seguidos
                     val allUids = (listOf(user.uid) + user.followingUids).distinct()
                     repository.getStories(allUids).collect { allStories ->
                         _stories.value = allStories
@@ -101,6 +104,13 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun loadFollowers() {
+        viewModelScope.launch {
+            val uid = auth.currentUser?.uid ?: return@launch
+            _followers.value = repository.getFollowers(uid)
+        }
+    }
+
     fun uploadStory(uri: Uri, isVideo: Boolean = false) {
         viewModelScope.launch {
             _isUploadingStory.value = true
@@ -111,6 +121,12 @@ class HomeViewModel @Inject constructor(
             } finally {
                 _isUploadingStory.value = false
             }
+        }
+    }
+
+    fun createMeetup(name: String, invitedUids: List<String>, photoUri: Uri?) {
+        viewModelScope.launch {
+            repository.createMeetup(name, invitedUids, photoUri)
         }
     }
 

@@ -224,6 +224,11 @@ fun AppNavigation(navController: NavHostController, auth: FirebaseAuth) {
             val otherId = backStackEntry.arguments?.getString("otherId") ?: ""
             ChatDetailScreen(navController, chatId, otherName, otherId)
         }
+
+        composable("groupDetail/{chatId}") { backStackEntry ->
+            val chatId = backStackEntry.arguments?.getString("chatId") ?: ""
+            GroupDetailScreen(navController, chatId)
+        }
         
         composable("otherProfile/{userId}") { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""

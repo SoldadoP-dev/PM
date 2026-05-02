@@ -98,14 +98,35 @@ fun ChatDetailScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.clickable {
-                            navController.navigate("otherProfile/$otherId")
+                            if (chatRoom?.isGroup == true) {
+                                navController.navigate("groupDetail/$chatId")
+                            } else {
+                                navController.navigate("otherProfile/$otherId")
+                            }
                         }
                     ) {
-                        UserAvatar(otherUser?.photoUrl, otherName, 36.dp)
+                        if (chatRoom?.isGroup == true) {
+                            val groupPhoto = chatRoom?.photoUrl
+                            val gName = chatRoom?.name ?: otherName
+                            if (!groupPhoto.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = groupPhoto,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(36.dp).clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Box(modifier = Modifier.size(36.dp).background(NeonPurple, CircleShape), contentAlignment = Alignment.Center) {
+                                    Text(gName.take(1).uppercase(), color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else {
+                            UserAvatar(otherUser?.photoUrl, otherName, 36.dp)
+                        }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text(otherName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            if (isOtherTyping) {
+                            Text(if (chatRoom?.isGroup == true) chatRoom?.name ?: otherName else otherName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            if (isOtherTyping && chatRoom?.isGroup != true) {
                                 Text("escribiendo...", fontSize = 12.sp, color = NeonPurple)
                             }
                         }
@@ -160,7 +181,7 @@ fun ChatDetailScreen(
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding)) {
             items(messages) { msg ->
                 val isMe = msg.senderId == viewModel.currentUserId
-                ChatBubble(msg, isMe)
+                ChatBubble(msg, isMe, isGroup = chatRoom?.isGroup == true)
             }
             if (isUploadingMedia) {
                 item {
@@ -169,7 +190,7 @@ fun ChatDetailScreen(
                     }
                 }
             }
-            if (isOtherTyping) {
+            if (isOtherTyping && chatRoom?.isGroup != true) {
                 item {
                     TypingIndicator()
                 }
@@ -179,16 +200,33 @@ fun ChatDetailScreen(
 }
 
 @Composable
-fun ChatBubble(msg: Message, isMe: Boolean) {
+fun ChatBubble(msg: Message, isMe: Boolean, isGroup: Boolean) {
+    if (msg.senderId == "system") {
+        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+            Surface(color = Color.DarkGray.copy(alpha = 0.5f), shape = RoundedCornerShape(12.dp)) {
+                Text(msg.text, color = Color.LightGray, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+            }
+        }
+        return
+    }
+
     val isMedia = !msg.imageUrl.isNullOrEmpty() || !msg.videoUrl.isNullOrEmpty()
     var showFullVideo by remember { mutableStateOf(false) }
     
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 2.dp), 
-        contentAlignment = if (isMe) Alignment.CenterEnd else Alignment.CenterStart
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
     ) {
+        if (!isMe) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+                UserAvatar(msg.senderPhotoUrl, msg.senderName, 24.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(msg.senderName, color = Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
         if (isMedia) {
             Box(
                 modifier = Modifier

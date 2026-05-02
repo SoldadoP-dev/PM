@@ -3,6 +3,7 @@ package com.example.pm.ui.screens
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -21,8 +22,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.material.icons.filled.LocationOn
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
@@ -48,14 +48,17 @@ import coil.request.SuccessResult
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import android.graphics.drawable.BitmapDrawable
+import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.pm.R
 import com.example.pm.Venue
+import com.example.pm.User
 import com.example.pm.ui.components.UserAvatar
 import com.example.pm.ui.theme.*
 import com.example.pm.ui.viewmodels.HomeViewModel
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -96,8 +99,6 @@ fun StoriesRow(viewModel: HomeViewModel, rootNavController: NavHostController) {
     }
 
     val groupedStories = stories.groupBy { it.userId }
-    
-    // ORDEN ESTABLE: Mis seguidos en el orden en que están guardados
     val friendIds = currentUser?.followingUids?.filter { groupedStories.containsKey(it) } ?: emptyList()
 
     LazyRow(
@@ -193,12 +194,16 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val venues by viewModel.venues.collectAsState()
+    val followers by viewModel.followers.collectAsState()
     
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(40.4168, -3.7038), 14f)
     }
     
     var searchQuery by remember { mutableStateOf("") }
+    var showMeetupDialog by remember { mutableStateOf(false) }
     var hasPermission by remember { 
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) 
     }
@@ -240,7 +245,8 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
                 isMyLocationEnabled = hasPermission,
                 mapStyleOptions = mapStyleJson?.let { MapStyleOptions(it) }
             ),
-            uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = true)
+            uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false),
+            contentPadding = PaddingValues(bottom = 80.dp) // Leave space at bottom for default elements if any
         ) {
             filteredVenues.forEach { venue ->
                 VenueMarker(
@@ -249,6 +255,32 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
                     cameraPositionState = cameraPositionState,
                     scope = scope
                 )
+            }
+        }
+
+        // Custom My Location Button in Bottom Right
+        if (hasPermission) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 16.dp, end = 16.dp)
+                    .size(50.dp)
+                    .background(Color(0xFF262626).copy(alpha = 0.9f), CircleShape)
+                    .border(1.dp, Color.Gray.copy(alpha = 0.3f), CircleShape)
+                    .clickable {
+                        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                            location?.let {
+                                scope.launch {
+                                    cameraPositionState.animate(
+                                        CameraUpdateFactory.newLatLngZoom(LatLng(it.latitude, it.longitude), 15f)
+                                    )
+                                }
+                            }
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.MyLocation, "Mi ubicación", tint = NeonPurple, modifier = Modifier.size(24.dp))
             }
         }
 
@@ -276,39 +308,56 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
                 .fillMaxWidth()
                 .zIndex(5f)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp)
-                    .background(Color(0xFF262626), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp)) {
-                    Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    BasicTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                        cursorBrush = SolidColor(Color.White),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-                        decorationBox = { innerTextField ->
-                            if (searchQuery.isEmpty()) {
-                                Text(stringResource(R.string.search_venue), color = Color.Gray, fontSize = 16.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp)
+                        .background(Color(0xFF262626).copy(alpha = 0.9f), RoundedCornerShape(23.dp))
+                        .border(1.dp, Color.Gray.copy(alpha = 0.4f), RoundedCornerShape(23.dp)),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                            cursorBrush = SolidColor(Color.White),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                            decorationBox = { innerTextField ->
+                                if (searchQuery.isEmpty()) {
+                                    Text(stringResource(R.string.search_venue), color = Color.Gray, fontSize = 16.sp)
+                                }
+                                innerTextField()
                             }
-                            innerTextField()
-                        }
-                    )
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.verticalGradient(listOf(NeonPurple, NeonPink))
+                        )
+                        .border(1.5.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                        .clickable { showMeetupDialog = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Groups, null, tint = Color.Black, modifier = Modifier.size(26.dp))
                 }
             }
 
             AnimatedVisibility(visible = searchQuery.isNotBlank()) {
                 Card(
                     modifier = Modifier.padding(top = 8.dp).fillMaxWidth().heightIn(max = 200.dp),
-                    colors = CardDefaults.cardColors(containerColor = CardGray.copy(alpha = 0.9f))
+                    colors = CardDefaults.cardColors(containerColor = CardGray.copy(alpha = 0.95f))
                 ) {
                     LazyColumn {
                         items(filteredVenues) { venue ->
@@ -327,6 +376,195 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
             }
         }
     }
+
+    if (showMeetupDialog) {
+        CreateMeetupDialog(
+            followers = followers,
+            onDismiss = { showMeetupDialog = false },
+            onCreate = { name, selectedIds, photoUri ->
+                viewModel.createMeetup(name, selectedIds, photoUri)
+                showMeetupDialog = false
+                Toast.makeText(context, "¡Quedada enviada!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+}
+
+@Composable
+fun CreateMeetupDialog(
+    followers: List<User>,
+    onDismiss: () -> Unit,
+    onCreate: (String, List<String>, Uri?) -> Unit
+) {
+    var meetupName by remember { mutableStateOf("") }
+    var participantSearch by remember { mutableStateOf("") }
+    var selectedPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    val selectedUserIds = remember { mutableStateListOf<String>() }
+
+    val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        selectedPhotoUri = uri
+    }
+
+    val filteredFollowers = followers.filter {
+        it.username.contains(participantSearch, ignoreCase = true)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DeepSpace,
+        tonalElevation = 8.dp,
+        title = { Text("Nueva Quedada", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Selector de imagen de la quedada
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .align(Alignment.CenterHorizontally)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1A1A1A))
+                        .border(1.dp, NeonPurple, CircleShape)
+                        .clickable { photoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (selectedPhotoUri != null) {
+                        AsyncImage(
+                            model = selectedPhotoUri,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(Icons.Default.CameraAlt, null, tint = Color.Gray)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = meetupName,
+                    onValueChange = { meetupName = it },
+                    label = { Text("¿Cómo se llama el plan?", color = Color.Gray) },
+                    textStyle = TextStyle(color = Color.White),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = NeonPurple,
+                        unfocusedBorderColor = Color.Gray.copy(alpha = 0.5f),
+                        focusedLabelColor = NeonPurple
+                    )
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                Surface(
+                    color = Color(0xFF1A1A1A),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    ) {
+                        Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        BasicTextField(
+                            value = participantSearch,
+                            onValueChange = { participantSearch = it },
+                            textStyle = TextStyle(color = Color.White, fontSize = 15.sp),
+                            cursorBrush = SolidColor(NeonPurple),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            decorationBox = { innerTextField ->
+                                if (participantSearch.isEmpty()) {
+                                    Text("Buscar amigos...", color = Color.Gray, fontSize = 15.sp)
+                                }
+                                innerTextField()
+                            }
+                        )
+                        if (participantSearch.isNotEmpty()) {
+                            Icon(
+                                Icons.Default.Close,
+                                null,
+                                tint = Color.Gray,
+                                modifier = Modifier.size(18.dp).clickable { participantSearch = "" }
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "Invitados (${selectedUserIds.size}):", 
+                    color = Color.White, 
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                LazyColumn(
+                    modifier = Modifier.height(220.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(filteredFollowers) { user ->
+                        val isSelected = selectedUserIds.contains(user.uid)
+                        Surface(
+                            color = if (isSelected) NeonPurple.copy(alpha = 0.1f) else Color.Transparent,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clickable {
+                                        if (isSelected) selectedUserIds.remove(user.uid)
+                                        else selectedUserIds.add(user.uid)
+                                    }
+                                    .padding(8.dp)
+                            ) {
+                                UserAvatar(user.photoUrl, user.username, 36.dp)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    user.username, 
+                                    color = Color.White, 
+                                    modifier = Modifier.weight(1f), 
+                                    fontSize = 15.sp
+                                )
+                                Icon(
+                                    if (isSelected) Icons.Default.CheckCircle else Icons.Outlined.Circle,
+                                    contentDescription = null,
+                                    tint = if (isSelected) NeonPurple else Color.Gray.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onCreate(meetupName, selectedUserIds.toList(), selectedPhotoUri) },
+                enabled = meetupName.isNotBlank() && selectedUserIds.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = NeonPurple,
+                    contentColor = Color.Black,
+                    disabledContainerColor = Color.Gray,
+                    disabledContentColor = Color.Black.copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+            ) {
+                Text("CREAR QUEDADA", fontWeight = FontWeight.ExtraBold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Cerrar", color = Color.Gray)
+            }
+        }
+    )
 }
 
 @Composable

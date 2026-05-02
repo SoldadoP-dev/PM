@@ -81,7 +81,11 @@ data class ChatRoom(
     val lastMessage: String = "",
     val lastTimestamp: Timestamp = Timestamp.now(),
     val typingUsers: Map<String, Boolean> = emptyMap(),
-    val deletedTimestamps: Map<String, Timestamp> = emptyMap()
+    val deletedTimestamps: Map<String, Timestamp> = emptyMap(),
+    @get:PropertyName("isGroup") @set:PropertyName("isGroup") var isGroup: Boolean = false,
+    val name: String? = null,
+    val photoUrl: String? = null,
+    val meetupId: String? = null
 )
 
 /**
@@ -90,6 +94,8 @@ data class ChatRoom(
 data class Message(
     @DocumentId val id: String = "",
     val senderId: String = "",
+    val senderName: String = "",
+    val senderPhotoUrl: String = "",
     val text: String = "",
     val imageUrl: String? = null,
     val videoUrl: String? = null,
@@ -110,6 +116,20 @@ data class ActivityNotification(
     val targetId: String = "", 
     val timestamp: Timestamp = Timestamp.now(),
     @get:PropertyName("isRead") @set:PropertyName("isRead") var isRead: Boolean = false
+)
+
+/**
+ * Quedada (Meetup)
+ */
+data class Meetup(
+    @DocumentId val id: String = "",
+    val creatorId: String = "",
+    val name: String = "",
+    val photoUrl: String? = null,
+    val invitedUids: List<String> = emptyList(),
+    val acceptedUids: List<String> = emptyList(),
+    val timestamp: Timestamp = Timestamp.now(),
+    val chatId: String = ""
 )
 
 /**

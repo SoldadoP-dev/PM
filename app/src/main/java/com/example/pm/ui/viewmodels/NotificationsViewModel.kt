@@ -26,12 +26,10 @@ class NotificationsViewModel @Inject constructor(
 
     private val _notifications = MutableStateFlow<List<ActivityNotification>>(emptyList())
     
-    // Notificaciones de solicitudes de seguimiento
     val followRequests: StateFlow<List<ActivityNotification>> = _notifications.map { list ->
         list.filter { it.type == "follow_request" }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // El resto de notificaciones (likes, comentarios, mensajes)
     val generalNotifications: StateFlow<List<ActivityNotification>> = _notifications.map { list ->
         list.filter { it.type != "follow_request" }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -90,6 +88,13 @@ class NotificationsViewModel @Inject constructor(
                 "followingUids", FieldValue.arrayUnion(currentUserId),
                 "followingCount", FieldValue.increment(1)
             )
+            markAsRead(notif.id)
+        }
+    }
+
+    fun respondToMeetup(notif: ActivityNotification, accept: Boolean) {
+        viewModelScope.launch {
+            repository.respondToMeetup(notif.targetId, accept)
             markAsRead(notif.id)
         }
     }
