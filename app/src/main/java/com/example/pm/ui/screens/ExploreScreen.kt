@@ -49,6 +49,7 @@ fun ExploreScreen(
     var searchQueryText by remember { mutableStateOf("") }
     val searchResult by viewModel.searchResults.collectAsState()
     val posts by viewModel.posts.collectAsState()
+    val isLoadingPosts by viewModel.isLoadingPosts.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
@@ -100,9 +101,13 @@ fun ExploreScreen(
                 }
             }
         } else {
-            if (posts.isEmpty()) {
+            if (isLoadingPosts) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = NeonPurple)
+                }
+            } else if (posts.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No hay publicaciones", color = Color.Gray, fontSize = 16.sp)
                 }
             } else {
                 // Grid de 3 columnas estilo Explorar Real

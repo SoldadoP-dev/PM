@@ -533,10 +533,12 @@ class FirebaseRepository @Inject constructor(
     fun getUserPosts(userId: String): Flow<List<Post>> = callbackFlow {
         val listener = firestore.collection("posts")
             .whereEqualTo("userId", userId)
-            .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
-                val posts = snapshot?.toObjects(Post::class.java) ?: emptyList()
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val posts = snapshot?.toObjects(Post::class.java)?.sortedByDescending { it.timestamp } ?: emptyList()
                 trySend(posts)
             }
         awaitClose { listener.remove() }
@@ -645,11 +647,13 @@ class FirebaseRepository @Inject constructor(
 
     fun getGlobalPosts(): Flow<List<Post>> = callbackFlow {
         val listener = firestore.collection("posts")
-            .whereEqualTo("isPrivate", false)
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) return@addSnapshotListener
-                val posts = snapshot?.toObjects(Post::class.java) ?: emptyList()
+                if (error != null) {
+                    trySend(emptyList())
+                    return@addSnapshotListener
+                }
+                val posts = snapshot?.toObjects(Post::class.java)?.filter { !it.isPrivate } ?: emptyList()
                 trySend(posts)
             }
         awaitClose { listener.remove() }

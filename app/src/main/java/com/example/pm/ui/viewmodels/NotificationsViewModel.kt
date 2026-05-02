@@ -94,8 +94,34 @@ class NotificationsViewModel @Inject constructor(
 
     fun respondToMeetup(notif: ActivityNotification, accept: Boolean) {
         viewModelScope.launch {
-            repository.respondToMeetup(notif.targetId, accept)
+            val meetup = repository.getMeetupByChatId(notif.targetId)
+            if (meetup != null) {
+                repository.respondToMeetup(meetup.id, accept)
+            }
             markAsRead(notif.id)
+        }
+    }
+
+    fun deleteNotifications(notificationIds: List<String>) {
+        viewModelScope.launch {
+            try {
+                val batch = firestore.batch()
+                var count = 0
+                for (id in notificationIds) {
+                    batch.delete(firestore.collection("notifications").document(id))
+                    count++
+                    // batch max is 500
+                    if (count == 500) {
+                        batch.commit().await()
+                        count = 0
+                    }
+                }
+                if (count > 0) {
+                    batch.commit().await()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("NotificationsViewModel", "Error deleting notifications", e)
+            }
         }
     }
 }

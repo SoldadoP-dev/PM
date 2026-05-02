@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -343,7 +344,11 @@ fun EnrichedChatItemWithFilter(
                 }
                 
                 Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text(groupName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(groupName, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Default.Groups, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                    }
                     Text(
                         chat.lastMessage, 
                         color = Color.Gray, 

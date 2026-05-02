@@ -109,8 +109,10 @@ fun PostDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { if (post?.userId == currentUserId) showDeleteDialog = true }) {
-                        Icon(Icons.Default.MoreVert, null, tint = Color.White)
+                    if (post?.userId == currentUserId) {
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.MoreVert, null, tint = Color.White)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
@@ -132,9 +134,9 @@ fun PostDetailScreen(
                                 )
                             }
 
-                            Box(modifier = Modifier.fillMaxWidth().aspectRatio(0.8f)) {
+                            Box(modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp).background(Color.Black), contentAlignment = Alignment.Center) {
                                 if (p.videoUrl != null) {
-                                    VideoPlayer(videoUrl = p.videoUrl, modifier = Modifier.fillMaxSize())
+                                    VideoPlayer(videoUrl = p.videoUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp))
                                 } else {
                                     SubcomposeAsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
@@ -142,9 +144,9 @@ fun PostDetailScreen(
                                             .crossfade(true)
                                             .build(),
                                         contentDescription = null,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop,
-                                        loading = { Box(Modifier.fillMaxSize().background(Color.DarkGray)) }
+                                        modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
+                                        contentScale = ContentScale.Fit,
+                                        loading = { Box(Modifier.fillMaxWidth().aspectRatio(1f).background(Color.DarkGray)) }
                                     )
                                 }
                             }

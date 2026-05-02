@@ -82,10 +82,10 @@ class ProfileViewModel @Inject constructor(
                 otherUser.uid != currentUser.uid && 
                 !followingSet.contains(otherUser.uid) &&
                 !hiddenSet.contains(otherUser.uid)
-            }.sortedByDescending { otherUser ->
+            }.shuffled().sortedByDescending { otherUser ->
                 val otherFollowing = otherUser.followingUids.toSet()
                 followingSet.intersect(otherFollowing).size
-            }.take(20)
+            }.take(10)
             
             _recommendedUsers.value = recommendations
         }

@@ -27,6 +27,9 @@ class ExploreViewModel @Inject constructor(
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
     val posts: StateFlow<List<Post>> = _posts
 
+    private val _isLoadingPosts = MutableStateFlow(true)
+    val isLoadingPosts: StateFlow<Boolean> = _isLoadingPosts
+
     private val _searchResults = MutableStateFlow<List<User>>(emptyList())
     val searchResults: StateFlow<List<User>> = _searchResults
 
@@ -56,6 +59,7 @@ class ExploreViewModel @Inject constructor(
         viewModelScope.launch {
             repository.getGlobalPosts().collect {
                 _posts.value = it
+                _isLoadingPosts.value = false
             }
         }
     }

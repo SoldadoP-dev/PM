@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,8 +34,10 @@ import com.example.pm.ui.theme.DeepSpace
 import com.example.pm.ui.theme.NeonPink
 import com.example.pm.ui.theme.NeonPurple
 import com.example.pm.ui.viewmodels.NotificationsViewModel
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun NotificationsScreen(
     navController: NavHostController,
@@ -42,19 +45,63 @@ fun NotificationsScreen(
 ) {
     val requests by viewModel.followRequests.collectAsState()
     val generalNotifs by viewModel.generalNotifications.collectAsState()
+    
+    var selectedMeetupNotif by remember { mutableStateOf<ActivityNotification?>(null) }
+    
+    var isSelectionMode by remember { mutableStateOf(false) }
+    val selectedNotifs = remember { mutableStateListOf<String>() }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.activity), fontWeight = FontWeight.Bold) },
+                title = { 
+                    if (isSelectionMode) {
+                        Text("${selectedNotifs.size} seleccionados", fontWeight = FontWeight.Bold)
+                    } else {
+                        Text(stringResource(R.string.activity), fontWeight = FontWeight.Bold) 
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                    if (isSelectionMode) {
+                        IconButton(onClick = { 
+                            isSelectionMode = false
+                            selectedNotifs.clear()
+                        }) {
+                            Icon(Icons.Default.Close, null, tint = Color.White)
+                        }
+                    } else {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                        }
                     }
                 },
                 actions = {
-                    TextButton(onClick = { viewModel.markAllAsRead() }) {
-                        Text(stringResource(R.string.read_all), color = NeonPurple)
+                    if (isSelectionMode) {
+                        IconButton(onClick = {
+                            val allNotifIds = requests.map { it.id } + generalNotifs.map { it.id }
+                            if (selectedNotifs.size == allNotifIds.size) {
+                                selectedNotifs.clear()
+                            } else {
+                                selectedNotifs.clear()
+                                selectedNotifs.addAll(allNotifIds)
+                            }
+                        }) {
+                            Icon(Icons.Default.SelectAll, null, tint = Color.White)
+                        }
+                        
+                        if (selectedNotifs.isNotEmpty()) {
+                            IconButton(onClick = {
+                                viewModel.deleteNotifications(selectedNotifs.toList())
+                                selectedNotifs.clear()
+                                isSelectionMode = false
+                            }) {
+                                Icon(Icons.Default.Delete, null, tint = NeonPink)
+                            }
+                        }
+                    } else {
+                        TextButton(onClick = { viewModel.markAllAsRead() }) {
+                            Text(stringResource(R.string.read_all), color = NeonPurple)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
@@ -75,11 +122,24 @@ fun NotificationsScreen(
                 items(requests, key = { it.id }) { notif ->
                     NotificationItem(
                         notif = notif,
+                        isSelectionMode = isSelectionMode,
+                        isSelected = selectedNotifs.contains(notif.id),
+                        onLongClick = { 
+                            isSelectionMode = true
+                            selectedNotifs.add(notif.id)
+                        },
                         onAccept = { viewModel.acceptFollowRequest(notif) },
                         onDecline = { /* Opcional: implementar rechazo */ },
                         onClick = {
-                            viewModel.markAsRead(notif.id)
-                            navController.navigate("otherProfile/${notif.fromUserId}")
+                            if (isSelectionMode) {
+                                if (selectedNotifs.contains(notif.id)) selectedNotifs.remove(notif.id)
+                                else selectedNotifs.add(notif.id)
+                                
+                                if (selectedNotifs.isEmpty()) isSelectionMode = false
+                            } else {
+                                viewModel.markAsRead(notif.id)
+                                navController.navigate("otherProfile/${notif.fromUserId}")
+                            }
                         }
                     )
                 }
@@ -101,20 +161,31 @@ fun NotificationsScreen(
                 items(generalNotifs, key = { it.id }) { notif ->
                     NotificationItem(
                         notif = notif,
+                        isSelectionMode = isSelectionMode,
+                        isSelected = selectedNotifs.contains(notif.id),
+                        onLongClick = { 
+                            isSelectionMode = true
+                            selectedNotifs.add(notif.id)
+                        },
                         onAccept = { if (notif.type == "meetup_invitation") viewModel.respondToMeetup(notif, true) },
                         onDecline = { if (notif.type == "meetup_invitation") viewModel.respondToMeetup(notif, false) },
                         onClick = {
-                            viewModel.markAsRead(notif.id)
-                            when(notif.type) {
-                                "like", "comment", "comment_like" -> navController.navigate("postDetail/${notif.targetId}")
-                                "message", "venue_invitation" -> {
-                                    val encodedName = Uri.encode(notif.fromUsername)
-                                    navController.navigate("chat/${notif.targetId}/$encodedName/${notif.fromUserId}")
-                                }
-                                "meetup_invitation" -> {
-                                    // Para invitaciones a quedadas (grupos), por ahora solo mostramos el diálogo o perfil
-                                    // Podríamos intentar navegar al perfil del creador
-                                    navController.navigate("otherProfile/${notif.fromUserId}")
+                            if (isSelectionMode) {
+                                if (selectedNotifs.contains(notif.id)) selectedNotifs.remove(notif.id)
+                                else selectedNotifs.add(notif.id)
+                                
+                                if (selectedNotifs.isEmpty()) isSelectionMode = false
+                            } else {
+                                viewModel.markAsRead(notif.id)
+                                when(notif.type) {
+                                    "like", "comment", "comment_like" -> navController.navigate("postDetail/${notif.targetId}")
+                                    "message", "venue_invitation" -> {
+                                        val encodedName = Uri.encode(notif.fromUsername)
+                                        navController.navigate("chat/${notif.targetId}/$encodedName/${notif.fromUserId}")
+                                    }
+                                    "meetup_invitation" -> {
+                                        selectedMeetupNotif = notif
+                                    }
                                 }
                             }
                         }
@@ -122,6 +193,21 @@ fun NotificationsScreen(
                 }
             }
         }
+    }
+
+    selectedMeetupNotif?.let { notif ->
+        MeetupPreviewDialog(
+            notif = notif,
+            onDismiss = { selectedMeetupNotif = null },
+            onAccept = { 
+                viewModel.respondToMeetup(notif, true)
+                selectedMeetupNotif = null
+            },
+            onDecline = { 
+                viewModel.respondToMeetup(notif, false)
+                selectedMeetupNotif = null
+            }
+        )
     }
 }
 
@@ -136,19 +222,32 @@ fun SectionHeader(title: String) {
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NotificationItem(
-    notif: ActivityNotification, 
-    onAccept: () -> Unit, 
+    notif: ActivityNotification,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onLongClick: () -> Unit = {},
+    onAccept: () -> Unit,
     onDecline: () -> Unit = {},
     onClick: () -> Unit
 ) {
     var isProcessedLocal by rememberSaveable(notif.id) { mutableStateOf(false) }
-    
+
     ListItem(
         modifier = Modifier
-            .background(if (!notif.isRead) NeonPurple.copy(alpha = 0.05f) else Color.Transparent)
-            .clickable { onClick() },
+            .background(
+                when {
+                    isSelected -> NeonPurple.copy(alpha = 0.2f)
+                    !notif.isRead -> NeonPurple.copy(alpha = 0.05f)
+                    else -> Color.Transparent
+                }
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         headlineContent = { 
             Text(
                 text = when(notif.type) {
@@ -180,7 +279,7 @@ fun NotificationItem(
         },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (notif.type == "follow_request" || notif.type == "meetup_invitation") {
+                if (notif.type == "follow_request") {
                     val currentlyProcessed = isProcessedLocal || notif.isRead
                     
                     if (!currentlyProcessed) {
@@ -205,8 +304,28 @@ fun NotificationItem(
                             }
                         }
                     }
+                } else if (notif.type == "meetup_invitation") {
+                    if (!notif.isRead) {
+                        Button(
+                            onClick = onClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonPurple),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                            modifier = Modifier.height(32.dp),
+                            shape = CircleShape
+                        ) {
+                            Text("Ver", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
                 }
-                if (!notif.isRead && notif.type != "follow_request" && notif.type != "meetup_invitation") {
+                
+                if (isSelectionMode) {
+                    Icon(
+                        if (isSelected) Icons.Default.CheckCircle else Icons.Outlined.Circle,
+                        contentDescription = null,
+                        tint = if (isSelected) NeonPurple else Color.Gray,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else if (!notif.isRead && notif.type != "follow_request" && notif.type != "meetup_invitation") {
                     Box(modifier = Modifier.size(10.dp).background(NeonPink, CircleShape))
                 }
             }
@@ -234,5 +353,36 @@ fun NotificationItem(
             }
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
+}
+
+@Composable
+fun MeetupPreviewDialog(
+    notif: ActivityNotification,
+    onDismiss: () -> Unit,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Invitación a Quedada", color = Color.White, fontWeight = FontWeight.Bold) },
+        text = { 
+            Column {
+                Text(notif.content, color = Color.LightGray, fontSize = 15.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Al aceptar, entrarás en el grupo de chat para poder ver los mensajes y detalles.", color = Color.Gray, fontSize = 13.sp)
+            }
+        },
+        confirmButton = {
+            Button(onClick = onAccept, colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)) { 
+                Text("Aceptar", color = Color.White, fontWeight = FontWeight.Bold) 
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDecline) { 
+                Text("Rechazar", color = Color.Gray) 
+            }
+        },
+        containerColor = DeepSpace
     )
 }
