@@ -100,7 +100,9 @@ data class Message(
     val imageUrl: String? = null,
     val videoUrl: String? = null,
     val timestamp: Timestamp = Timestamp.now(),
-    @get:PropertyName("isRead") @set:PropertyName("isRead") var isRead: Boolean = false
+    @get:PropertyName("isRead") @set:PropertyName("isRead") var isRead: Boolean = false,
+    val venueInviteId: String? = null,
+    val venueInviteName: String? = null
 )
 
 /**

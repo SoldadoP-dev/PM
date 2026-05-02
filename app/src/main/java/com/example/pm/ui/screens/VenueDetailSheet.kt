@@ -11,7 +11,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -25,12 +27,12 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.example.pm.ChatRoom
 import com.example.pm.R
 import com.example.pm.User
 import com.example.pm.Venue
@@ -55,9 +57,15 @@ fun VenueDetailSheet(
     val otherVenueAttendance by viewModel.otherVenueAttendance.collectAsState()
     val hasOtherAttendance by viewModel.hasOtherAttendance.collectAsState()
     
+    val followers by viewModel.followers.collectAsState()
+    val chats by viewModel.chats.collectAsState()
+    val venueAttendeeUids by viewModel.venueAttendeeUids.collectAsState()
+
     var showTagSelection by remember { mutableStateOf(false) }
     var selectedTagForList by remember { mutableStateOf<String?>(null) }
     var showAttendanceConflictDialog by remember { mutableStateOf(false) }
+    var showInviteConfirmDialog by remember { mutableStateOf(false) }
+    var showInviteSelectionDialog by remember { mutableStateOf(false) }
 
     // Participant search and filter
     var participantSearchQuery by remember { mutableStateOf("") }
@@ -76,7 +84,7 @@ fun VenueDetailSheet(
         viewModel.loadVenueDetails(venue.id)
     }
 
-    // Diálogo de Confirmación simplificado (Popup sin icono)
+    // Diálogo de Confirmación de cambio de planes
     if (showAttendanceConflictDialog) {
         AlertDialog(
             onDismissRequest = { showAttendanceConflictDialog = false },
@@ -111,6 +119,52 @@ fun VenueDetailSheet(
         )
     }
 
+    // Diálogo de Confirmación para invitar
+    if (showInviteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showInviteConfirmDialog = false },
+            title = { Text(text = "¿Invitar amigos?", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = "¿Quieres mandar una solicitud de unión a tus seguidores y chats para que se unan a ti en ${venue.name}?",
+                    color = Color.LightGray,
+                    fontSize = 16.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showInviteConfirmDialog = false
+                        showInviteSelectionDialog = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
+                ) {
+                    Text("Si", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showInviteConfirmDialog = false }) {
+                    Text("Ahora no", color = Color.Gray)
+                }
+            },
+            containerColor = CardGray,
+            shape = RoundedCornerShape(28.dp)
+        )
+    }
+
+    if (showInviteSelectionDialog) {
+        InviteSelectionDialog(
+            followers = followers,
+            chats = chats,
+            venueAttendeeUids = venueAttendeeUids,
+            onDismiss = { showInviteSelectionDialog = false },
+            onSend = { selectedUsers, selectedChats ->
+                viewModel.sendInvitations(venue.id, venue.name, selectedUsers, selectedChats)
+                showInviteSelectionDialog = false
+            }
+        )
+    }
+
     if (showTagSelection) {
         TagSelectionDialog(
             availableTags = availableTags.map { it.name },
@@ -118,6 +172,7 @@ fun VenueDetailSheet(
             onConfirm = { tags ->
                 viewModel.toggleAttendance(venue.id, tags)
                 showTagSelection = false
+                showInviteConfirmDialog = true
             }
         )
     }
@@ -263,29 +318,40 @@ fun VenueDetailSheet(
             }
         }
 
-        Button(
-            onClick = { 
-                if (isAttending) {
-                    viewModel.toggleAttendance(venue.id) 
-                } else {
-                    if (hasOtherAttendance) {
-                        showAttendanceConflictDialog = true
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = { 
+                    if (isAttending) {
+                        viewModel.toggleAttendance(venue.id) 
                     } else {
-                        showTagSelection = true
+                        if (hasOtherAttendance) {
+                            showAttendanceConflictDialog = true
+                        } else {
+                            showTagSelection = true
+                        }
                     }
+                },
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (isAttending) Color.DarkGray else NeonPurple)
+            ) {
+                Icon(if (isAttending) Icons.Default.CheckCircle else Icons.Default.Add, null, tint = if (isAttending) NeonPurple else Color.Black)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    if (isAttending) stringResource(R.string.im_going) else stringResource(R.string.join_me), 
+                    color = if (isAttending) Color.White else Color.Black, 
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            
+            if (isAttending) {
+                IconButton(
+                    onClick = { showInviteSelectionDialog = true },
+                    modifier = Modifier.size(56.dp).background(NeonPurple, RoundedCornerShape(16.dp))
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, null, tint = Color.Black)
                 }
-            },
-            modifier = Modifier.fillMaxWidth().height(56.dp).padding(top = 16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = if (isAttending) Color.DarkGray else NeonPurple)
-        ) {
-            Icon(if (isAttending) Icons.Default.CheckCircle else Icons.Default.Add, null, tint = if (isAttending) NeonPurple else Color.Black)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                if (isAttending) stringResource(R.string.im_going) else stringResource(R.string.join_me), 
-                color = if (isAttending) Color.White else Color.Black, 
-                fontWeight = FontWeight.ExtraBold
-            )
+            }
         }
         Spacer(modifier = Modifier.height(32.dp))
     }
@@ -396,6 +462,148 @@ fun TagUsersDialog(
                         item {
                             Text("Cargando usuarios...", color = Color.DarkGray, modifier = Modifier.padding(vertical = 16.dp))
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun InviteSelectionDialog(
+    followers: List<User>,
+    chats: List<ChatRoom>,
+    venueAttendeeUids: Set<String>,
+    onDismiss: () -> Unit,
+    onSend: (List<String>, List<String>) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val selectedUserIds = remember { mutableStateListOf<String>() }
+    val selectedChatIds = remember { mutableStateListOf<String>() }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A))
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("Invitar a la quedada", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                
+                // Search Bar
+                Box(
+                    modifier = Modifier
+                        .padding(vertical = 16.dp)
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .background(Color(0xFF262626), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp)) {
+                        Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        BasicTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            textStyle = TextStyle(color = Color.White, fontSize = 15.sp),
+                            cursorBrush = SolidColor(NeonPurple),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            decorationBox = { innerTextField ->
+                                if (searchQuery.isEmpty()) Text("Buscar...", color = Color.Gray, fontSize = 15.sp)
+                                innerTextField()
+                            }
+                        )
+                    }
+                }
+
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    // SECCIÓN CHATS
+                    val filteredChats = chats.filter { 
+                        it.isGroup && (it.name?.contains(searchQuery, ignoreCase = true) == true)
+                    }
+                    if (filteredChats.isNotEmpty()) {
+                        item {
+                            Text("GRUPOS", color = NeonPurple, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 8.dp))
+                        }
+                        items(filteredChats) { chat ->
+                            val isSelected = selectedChatIds.contains(chat.id)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { if (isSelected) selectedChatIds.remove(chat.id) else selectedChatIds.add(chat.id) }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                UserAvatar(chat.photoUrl, chat.name ?: "?", 40.dp)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(chat.name ?: "Grupo", color = Color.White, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = null,
+                                    colors = CheckboxDefaults.colors(checkedColor = NeonPurple, uncheckedColor = Color.Gray)
+                                )
+                            }
+                        }
+                    }
+
+                    // SECCIÓN SEGUIDORES
+                    val filteredFollowers = followers.filter { 
+                        it.username.contains(searchQuery, ignoreCase = true) 
+                    }
+                    if (filteredFollowers.isNotEmpty()) {
+                        item {
+                            Text("SEGUIDORES", color = NeonPurple, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+                        }
+                        items(filteredFollowers) { user ->
+                            val isAttending = venueAttendeeUids.contains(user.uid)
+                            val isSelected = selectedUserIds.contains(user.uid)
+                            
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = !isAttending) { 
+                                        if (isSelected) selectedUserIds.remove(user.uid) else selectedUserIds.add(user.uid) 
+                                    }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                UserAvatar(user.photoUrl, user.username, 40.dp)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(user.username, color = if (isAttending) Color.Gray else Color.White, fontWeight = FontWeight.Medium)
+                                    if (isAttending) {
+                                        Text("Ya está apuntado", color = NeonPurple, fontSize = 11.sp)
+                                    }
+                                }
+                                if (!isAttending) {
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = null,
+                                        colors = CheckboxDefaults.colors(checkedColor = NeonPurple, uncheckedColor = Color.Gray)
+                                    )
+                                } else {
+                                    Icon(Icons.Default.Check, null, tint = NeonPurple, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancelar", color = Color.Gray)
+                    }
+                    Button(
+                        onClick = { onSend(selectedUserIds.toList(), selectedChatIds.toList()) },
+                        enabled = selectedUserIds.isNotEmpty() || selectedChatIds.isNotEmpty(),
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
+                    ) {
+                        Text("Enviar invitación", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }

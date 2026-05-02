@@ -106,7 +106,7 @@ class MainActivity : ComponentActivity() {
         
         if (targetId != null && type != null) {
             when (type) {
-                "message" -> {
+                "message", "venue_invitation" -> {
                     if (fromUserId != null) {
                         val encodedName = Uri.encode(fromUsername)
                         navController.navigate("chat/$targetId/$encodedName/$fromUserId")
@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
                 "like", "comment", "comment_like" -> {
                     navController.navigate("postDetail/$targetId")
                 }
-                "follow_request" -> {
+                "follow_request", "meetup_invitation" -> {
                     navController.navigate("notifications")
                 }
             }
@@ -151,10 +151,11 @@ class MainActivity : ComponentActivity() {
                                 "comment" -> "Nuevo Comentario"
                                 "comment_like" -> "Le gusta tu respuesta"
                                 "follow_request" -> "Solicitud de seguimiento"
+                                "venue_invitation", "meetup_invitation" -> "Invitación a quedada"
                                 else -> "Notificación de PM"
                             }
                             val message = when(notif.type) {
-                                "message", "comment" -> notif.content
+                                "message", "comment", "venue_invitation", "meetup_invitation" -> notif.content
                                 "like" -> "${notif.fromUsername} le dio like a tu post"
                                 "comment_like" -> "A ${notif.fromUsername} le gusta tu comentario"
                                 "follow_request" -> "${notif.fromUsername} quiere seguirte"

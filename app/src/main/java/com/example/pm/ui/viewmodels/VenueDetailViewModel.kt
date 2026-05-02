@@ -2,6 +2,8 @@ package com.example.pm.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pm.Attendance
+import com.example.pm.ChatRoom
 import com.example.pm.FirebaseRepository
 import com.example.pm.Tag
 import com.example.pm.User
@@ -11,9 +13,10 @@ import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -53,9 +56,23 @@ class VenueDetailViewModel @Inject constructor(
 
     private val _currentVenueId = MutableStateFlow<String?>(null)
 
+    // New states for invitation system
+    private val _followers = MutableStateFlow<List<User>>(emptyList())
+    val followers: StateFlow<List<User>> = _followers
+
+    private val _chats = MutableStateFlow<List<ChatRoom>>(emptyList())
+    val chats: StateFlow<List<ChatRoom>> = _chats
+
+    private val _venueAttendeeUids = MutableStateFlow<Set<String>>(emptySet())
+    val venueAttendeeUids: StateFlow<Set<String>> = _venueAttendeeUids
+
+    val currentUserAttendance: StateFlow<Attendance?> = repository.getUserAttendanceFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     init {
         loadTags()
         observeUserAttendance()
+        loadFollowersAndChats()
     }
 
     private fun loadTags() {
@@ -68,16 +85,29 @@ class VenueDetailViewModel @Inject constructor(
 
     private fun observeUserAttendance() {
         viewModelScope.launch {
-            combine(repository.getUserAttendanceFlow(), _currentVenueId) { attendance, venueId ->
-                attendance to venueId
-            }.collectLatest { (attendance, venueId) ->
-                if (attendance != null && venueId != null && attendance.venueId != venueId) {
-                    _hasOtherAttendance.value = true
+            repository.getUserAttendanceFlow().collectLatest { attendance ->
+                if (attendance != null) {
+                    val venueId = _currentVenueId.value
+                    _hasOtherAttendance.value = venueId != null && attendance.venueId != venueId
                     _otherVenueAttendance.value = repository.getVenueById(attendance.venueId)
                 } else {
                     _hasOtherAttendance.value = false
                     _otherVenueAttendance.value = null
                 }
+            }
+        }
+    }
+
+    private fun loadFollowersAndChats() {
+        viewModelScope.launch {
+            val user = repository.getCurrentUser()
+            if (user != null) {
+                _followers.value = repository.getFollowers(user.uid)
+            }
+        }
+        viewModelScope.launch {
+            repository.getChatsFlow().collect {
+                _chats.value = it
             }
         }
     }
@@ -88,6 +118,7 @@ class VenueDetailViewModel @Inject constructor(
             repository.getVenueAttendances(venueId).collect { attendances ->
                 _attendancesCount.value = attendances.size
                 _isAttending.value = attendances.any { it.userId == currentUserId }
+                _venueAttendeeUids.value = attendances.map { it.userId }.toSet()
                 
                 val stats = mutableMapOf<String, Int>()
                 attendances.forEach { attendance ->
@@ -136,6 +167,24 @@ class VenueDetailViewModel @Inject constructor(
     fun clearCurrentAttendance() {
         viewModelScope.launch {
             repository.clearAttendance()
+        }
+    }
+
+    fun sendInvitations(venueId: String, venueName: String, selectedUserIds: List<String>, selectedChatIds: List<String>) {
+        viewModelScope.launch {
+            repository.sendVenueInvitation(venueId, venueName, selectedUserIds, selectedChatIds)
+        }
+    }
+
+    fun checkAttendanceConflict(targetVenueId: String, onResult: (Venue?) -> Unit) {
+        viewModelScope.launch {
+            val current = repository.getUserAttendance()
+            if (current != null && current.venueId != targetVenueId) {
+                val otherVenue = repository.getVenueById(current.venueId)
+                onResult(otherVenue)
+            } else {
+                onResult(null)
+            }
         }
     }
 }

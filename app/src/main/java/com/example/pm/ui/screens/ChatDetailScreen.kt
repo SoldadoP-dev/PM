@@ -17,7 +17,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -44,6 +46,7 @@ import com.example.pm.ui.theme.CardGray
 import com.example.pm.ui.theme.DeepSpace
 import com.example.pm.ui.theme.NeonPurple
 import com.example.pm.ui.viewmodels.ChatViewModel
+import com.example.pm.ui.viewmodels.VenueDetailViewModel
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,7 +56,8 @@ fun ChatDetailScreen(
     chatId: String,
     otherName: String,
     otherId: String,
-    viewModel: ChatViewModel = hiltViewModel()
+    viewModel: ChatViewModel = hiltViewModel(),
+    venueViewModel: VenueDetailViewModel = hiltViewModel()
 ) {
     var text by remember { mutableStateOf("") }
     val messages by viewModel.messages.collectAsState()
@@ -61,6 +65,13 @@ fun ChatDetailScreen(
     val chatRoom by viewModel.chatRoom.collectAsState()
     val listState = rememberLazyListState()
     val context = LocalContext.current
+
+    // Invitation handling
+    var showTagDialogForInvite by remember { mutableStateOf<String?>(null) }
+    var showConflictDialogForInvite by remember { mutableStateOf<String?>(null) }
+    val availableTags by venueViewModel.availableTags.collectAsState()
+    val userAttendance by venueViewModel.currentUserAttendance.collectAsState()
+    val otherVenueAttendance by venueViewModel.otherVenueAttendance.collectAsState()
 
     LaunchedEffect(chatId) {
         viewModel.loadChat(chatId, otherId)
@@ -89,6 +100,52 @@ fun ChatDetailScreen(
             val isVideo = type?.contains("video") == true
             viewModel.sendMedia(chatId, it, isVideo)
         }
+    }
+
+    if (showConflictDialogForInvite != null) {
+        AlertDialog(
+            onDismissRequest = { showConflictDialogForInvite = null },
+            title = { Text(text = "¿Cambiar de planes?", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                val otherNameText = otherVenueAttendance?.name ?: "otra discoteca"
+                Text(
+                    text = "Ya estás apuntado en $otherNameText. Si te unes a esta quedada, se cancelará tu reserva anterior.",
+                    color = Color.LightGray,
+                    fontSize = 16.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        venueViewModel.clearCurrentAttendance()
+                        val venueId = showConflictDialogForInvite!!
+                        showConflictDialogForInvite = null
+                        showTagDialogForInvite = venueId
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
+                ) {
+                    Text("Sí, cambiar", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConflictDialogForInvite = null }) {
+                    Text("Cancelar", color = Color.Gray)
+                }
+            },
+            containerColor = CardGray,
+            shape = RoundedCornerShape(28.dp)
+        )
+    }
+
+    if (showTagDialogForInvite != null) {
+        TagSelectionDialog(
+            availableTags = availableTags.map { it.name },
+            onDismiss = { showTagDialogForInvite = null },
+            onConfirm = { tags ->
+                venueViewModel.toggleAttendance(showTagDialogForInvite!!, tags)
+                showTagDialogForInvite = null
+            }
+        )
     }
 
     Scaffold(
@@ -181,7 +238,19 @@ fun ChatDetailScreen(
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding)) {
             items(messages) { msg ->
                 val isMe = msg.senderId == viewModel.currentUserId
-                ChatBubble(msg, isMe, isGroup = chatRoom?.isGroup == true)
+                val isAlreadyAttending = userAttendance?.venueId == msg.venueInviteId
+                ChatBubble(
+                    msg = msg, 
+                    isMe = isMe, 
+                    isAlreadyAttending = isAlreadyAttending,
+                    onJoinInvite = { venueId ->
+                        if (userAttendance != null && userAttendance?.venueId != venueId) {
+                            showConflictDialogForInvite = venueId
+                        } else {
+                            showTagDialogForInvite = venueId
+                        }
+                    }
+                )
             }
             if (isUploadingMedia) {
                 item {
@@ -200,7 +269,12 @@ fun ChatDetailScreen(
 }
 
 @Composable
-fun ChatBubble(msg: Message, isMe: Boolean, isGroup: Boolean) {
+fun ChatBubble(
+    msg: Message, 
+    isMe: Boolean, 
+    isAlreadyAttending: Boolean = false,
+    onJoinInvite: (String) -> Unit = {}
+) {
     if (msg.senderId == "system") {
         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
             Surface(color = Color.DarkGray.copy(alpha = 0.5f), shape = RoundedCornerShape(12.dp)) {
@@ -211,6 +285,7 @@ fun ChatBubble(msg: Message, isMe: Boolean, isGroup: Boolean) {
     }
 
     val isMedia = !msg.imageUrl.isNullOrEmpty() || !msg.videoUrl.isNullOrEmpty()
+    val isVenueInvite = !msg.venueInviteId.isNullOrEmpty()
     var showFullVideo by remember { mutableStateOf(false) }
     
     Column(
@@ -227,7 +302,54 @@ fun ChatBubble(msg: Message, isMe: Boolean, isGroup: Boolean) {
             }
         }
 
-        if (isMedia) {
+        if (isVenueInvite) {
+            Surface(
+                color = if (isMe) NeonPurple else CardGray,
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.LocationOn, null, tint = if (isMe) Color.Black else NeonPurple, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = msg.venueInviteName ?: "Quedada",
+                            color = if (isMe) Color.Black else Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                    Text(
+                        text = msg.text,
+                        color = if (isMe) Color.Black.copy(alpha = 0.7f) else Color.Gray,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                    
+                    Button(
+                        onClick = { if (!isAlreadyAttending) msg.venueInviteId?.let { onJoinInvite(it) } },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isAlreadyAttending) Color.DarkGray else NeonPurple,
+                            disabledContainerColor = Color.DarkGray
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.padding(top = 8.dp).height(36.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                        enabled = !isAlreadyAttending || isMe
+                    ) {
+                        if (isAlreadyAttending) {
+                            Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = NeonPurple, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        Text(
+                            if (isAlreadyAttending) "Apuntado" else "Apuntarse", 
+                            color = if (isAlreadyAttending) Color.White else Color.Black, 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+        } else if (isMedia) {
             Box(
                 modifier = Modifier
                     .width(250.dp)

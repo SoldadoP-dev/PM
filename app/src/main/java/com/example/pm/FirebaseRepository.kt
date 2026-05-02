@@ -299,13 +299,27 @@ class FirebaseRepository @Inject constructor(
         awaitClose { listener.remove() }
     }
 
-    suspend fun sendMessage(chatId: String, text: String, imageUrl: String? = null, videoUrl: String? = null) {
+    suspend fun sendMessage(
+        chatId: String, 
+        text: String, 
+        imageUrl: String? = null, 
+        videoUrl: String? = null,
+        venueInviteId: String? = null,
+        venueInviteName: String? = null
+    ) {
         val uid = auth.currentUser?.uid ?: return
         val user = getCurrentUser() ?: return
         
-        firestore.collection("chats").document(chatId).update(
-            "deletedTimestamps.$uid", FieldValue.delete()
-        ).await()
+        // Remove deletedTimestamp for everyone so they see the new message
+        val chatRef = firestore.collection("chats").document(chatId)
+        val chatDoc = chatRef.get().await()
+        val participants = chatDoc.get("participants") as? List<String> ?: emptyList()
+        
+        val updates = mutableMapOf<String, Any>()
+        participants.forEach { pUid ->
+            updates["deletedTimestamps.$pUid"] = FieldValue.delete()
+        }
+        chatRef.update(updates).await()
 
         val message = Message(
             senderId = uid,
@@ -315,31 +329,32 @@ class FirebaseRepository @Inject constructor(
             imageUrl = imageUrl,
             videoUrl = videoUrl,
             timestamp = Timestamp.now(),
-            isRead = false
+            isRead = false,
+            venueInviteId = venueInviteId,
+            venueInviteName = venueInviteName
         )
         firestore.collection("chats").document(chatId).collection("messages").add(message).await()
         
         val lastMsg = when {
+            venueInviteId != null -> "📍 Invitación a ${venueInviteName}"
             videoUrl != null -> "🎥 Vídeo"
             imageUrl != null -> "📷 Foto"
             else -> text
         }
-        firestore.collection("chats").document(chatId).update(
+        chatRef.update(
             "lastMessage", lastMsg,
             "lastTimestamp", Timestamp.now()
         ).await()
 
-        val chatDoc = firestore.collection("chats").document(chatId).get().await()
         val isGroup = chatDoc.getBoolean("isGroup") ?: false
         if (!isGroup) {
-            val participants = chatDoc.get("participants") as? List<String> ?: emptyList()
             val otherId = participants.find { it != uid }
             if (otherId != null) {
                 sendNotification(ActivityNotification(
                     fromUserId = uid,
                     fromUsername = user.username,
                     toUserId = otherId,
-                    type = "message",
+                    type = if (venueInviteId != null) "venue_invitation" else "message",
                     content = lastMsg,
                     targetId = chatId,
                     isRead = false
@@ -348,14 +363,38 @@ class FirebaseRepository @Inject constructor(
         }
     }
 
-    suspend fun createChatMessageVideo(chatId: String, uri: Uri) {
-        val videoUrl = uploadFile(uri, "chat_videos", true)
-        val thumbnailBitmap = generateVideoThumbnail(uri)
-        val imageUrl = if (thumbnailBitmap != null) {
-            uploadBitmap(thumbnailBitmap, "chat_thumbnails")
-        } else null
+    suspend fun sendVenueInvitation(venueId: String, venueName: String, selectedUserIds: List<String>, selectedChatIds: List<String>) {
+        val currentUser = getCurrentUser() ?: return
         
-        sendMessage(chatId, "", imageUrl = imageUrl, videoUrl = videoUrl)
+        // Enviar a chats existentes
+        selectedChatIds.forEach { chatId ->
+            sendMessage(chatId, "¡Vente conmigo a $venueName!", venueInviteId = venueId, venueInviteName = venueName)
+        }
+        
+        // Enviar a usuarios individuales (creando chat si no existe)
+        selectedUserIds.forEach { userId ->
+            val chatId = getOrCreateChatId(userId)
+            sendMessage(chatId, "¡Vente conmigo a $venueName!", venueInviteId = venueId, venueInviteName = venueName)
+        }
+    }
+    
+    suspend fun getOrCreateChatId(targetUserId: String): String {
+        val currentUserId = auth.currentUser?.uid ?: return ""
+        val participants = listOf(currentUserId, targetUserId).sorted()
+        
+        val existing = firestore.collection("chats")
+            .whereEqualTo("participants", participants)
+            .whereEqualTo("isGroup", false)
+            .get()
+            .await()
+
+        return if (!existing.isEmpty) {
+            existing.documents.first().id
+        } else {
+            val chatRoom = ChatRoom(participants = participants)
+            val ref = firestore.collection("chats").add(chatRoom).await()
+            ref.id
+        }
     }
 
     fun setTyping(chatId: String, isTyping: Boolean) {
@@ -404,7 +443,7 @@ class FirebaseRepository @Inject constructor(
                 toUserId = invitedUid,
                 type = "meetup_invitation",
                 content = "Te ha invitado a la quedada: $name",
-                targetId = meetupRef.id
+                targetId = chatRef.id // Send chatId for direct navigation
             ))
         }
     }
@@ -668,5 +707,51 @@ class FirebaseRepository @Inject constructor(
             }
         }
         return followers
+    }
+
+    fun getChatsFlow(): Flow<List<ChatRoom>> = callbackFlow {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val listener = firestore.collection("chats")
+            .whereArrayContains("participants", uid)
+            .addSnapshotListener { snapshot, _ ->
+                val chatList = snapshot?.toObjects(ChatRoom::class.java) ?: emptyList()
+                trySend(chatList.sortedByDescending { it.lastTimestamp })
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun createChatMessageVideo(chatId: String, uri: Uri) {
+        val videoUrl = uploadFile(uri, "chat_videos", true)
+        val thumbnailBitmap = generateVideoThumbnail(uri)
+        val imageUrl = if (thumbnailBitmap != null) {
+            uploadBitmap(thumbnailBitmap, "chat_thumbnails")
+        } else null
+        
+        sendMessage(chatId, "", imageUrl = imageUrl, videoUrl = videoUrl)
+    }
+
+    suspend fun getMeetup(meetupId: String): Meetup? {
+        return firestore.collection("meetups").document(meetupId).get().await().toObject(Meetup::class.java)
+    }
+
+    suspend fun getMeetupByChatId(chatId: String): Meetup? {
+        val meetupSnapshot = firestore.collection("meetups")
+            .whereEqualTo("chatId", chatId)
+            .get()
+            .await()
+        return meetupSnapshot.toObjects(Meetup::class.java).firstOrNull()
+    }
+
+    suspend fun getUserAttendance(userId: String): Attendance? {
+        val snapshot = firestore.collection("attendances")
+            .whereEqualTo("userId", userId)
+            .get()
+            .await()
+        return snapshot.toObjects(Attendance::class.java).firstOrNull()
     }
 }

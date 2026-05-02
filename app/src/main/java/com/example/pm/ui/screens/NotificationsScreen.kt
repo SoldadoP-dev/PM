@@ -1,5 +1,6 @@
 package com.example.pm.ui.screens
 
+import android.net.Uri
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -106,8 +107,15 @@ fun NotificationsScreen(
                             viewModel.markAsRead(notif.id)
                             when(notif.type) {
                                 "like", "comment", "comment_like" -> navController.navigate("postDetail/${notif.targetId}")
-                                "message" -> navController.navigate("chat/${notif.targetId}/${notif.fromUsername}/${notif.fromUserId}")
-                                "meetup_invitation" -> { /* Ya se maneja con botones */ }
+                                "message", "venue_invitation" -> {
+                                    val encodedName = Uri.encode(notif.fromUsername)
+                                    navController.navigate("chat/${notif.targetId}/$encodedName/${notif.fromUserId}")
+                                }
+                                "meetup_invitation" -> {
+                                    // Para invitaciones a quedadas (grupos), por ahora solo mostramos el diálogo o perfil
+                                    // Podríamos intentar navegar al perfil del creador
+                                    navController.navigate("otherProfile/${notif.fromUserId}")
+                                }
                             }
                         }
                     )
@@ -140,7 +148,7 @@ fun NotificationItem(
     ListItem(
         modifier = Modifier
             .background(if (!notif.isRead) NeonPurple.copy(alpha = 0.05f) else Color.Transparent)
-            .clickable { if (notif.type != "meetup_invitation") onClick() },
+            .clickable { onClick() },
         headlineContent = { 
             Text(
                 text = when(notif.type) {
@@ -149,7 +157,7 @@ fun NotificationItem(
                     "comment" -> "${notif.fromUsername} comentó tu post"
                     "comment_like" -> "A ${notif.fromUsername} le gusta tu respuesta"
                     "message" -> "${notif.fromUsername} te envió un mensaje"
-                    "meetup_invitation" -> "${notif.fromUsername} te invitó a una quedada"
+                    "meetup_invitation", "venue_invitation" -> "${notif.fromUsername} te invitó a una quedada"
                     else -> notif.fromUsername
                 },
                 fontWeight = if (!notif.isRead) FontWeight.ExtraBold else FontWeight.Normal, 
@@ -160,7 +168,7 @@ fun NotificationItem(
         supportingContent = { 
             Text(
                 text = when(notif.type) {
-                    "comment", "message", "meetup_invitation" -> notif.content
+                    "comment", "message", "meetup_invitation", "venue_invitation" -> notif.content
                     "like", "comment_like" -> "Toca para ver la publicación"
                     "follow_request" -> "Toca para ver el perfil"
                     else -> "Nueva actividad"
@@ -216,7 +224,7 @@ fun NotificationItem(
                         "comment" -> Icons.AutoMirrored.Filled.Comment
                         "message" -> Icons.AutoMirrored.Filled.Chat
                         "follow_request" -> Icons.Default.PersonAdd
-                        "meetup_invitation" -> Icons.Default.Groups
+                        "meetup_invitation", "venue_invitation" -> Icons.Default.Groups
                         else -> Icons.Default.Notifications
                     },
                     contentDescription = null,
