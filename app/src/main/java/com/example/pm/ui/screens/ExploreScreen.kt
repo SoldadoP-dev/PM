@@ -132,7 +132,7 @@ fun ExplorePostItem(post: Post, navController: NavHostController) {
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .clickable { navController.navigate("postDetail/${post.id}") }
+            .clickable { navController.navigate("postFeed/explore/none/${post.id}") }
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)

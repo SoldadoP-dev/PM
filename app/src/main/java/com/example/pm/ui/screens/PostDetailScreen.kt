@@ -39,14 +39,64 @@ import com.example.pm.ui.components.VideoPlayer
 import com.example.pm.ui.theme.NeonPink
 import com.example.pm.ui.viewmodels.PostDetailViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.ExperimentalFoundationApi
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PostDetailScreen(
     navController: NavHostController,
     postId: String,
+    contextStr: String = "single",
+    userId: String = "none",
     viewModel: PostDetailViewModel = hiltViewModel()
 ) {
-    val post by viewModel.post.collectAsState()
+    val feed by viewModel.feed.collectAsState()
+    val initialPage by viewModel.initialPage.collectAsState()
+
+    LaunchedEffect(postId, contextStr, userId) {
+        viewModel.loadFeed(contextStr, userId, postId)
+    }
+
+    if (initialPage != -1 && feed.isNotEmpty()) {
+        val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { feed.size })
+
+        LaunchedEffect(pagerState.currentPage, feed) {
+            if (pagerState.currentPage < feed.size) {
+                viewModel.onPageChanged(feed[pagerState.currentPage])
+            }
+        }
+
+        VerticalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            key = { feed[it].id }
+        ) { page ->
+            val pagePost = feed[page]
+            val currentVisiblePost by viewModel.post.collectAsState()
+            val displayPost = if (pagerState.currentPage == page) currentVisiblePost ?: pagePost else pagePost
+
+            PostDetailContent(
+                post = displayPost,
+                viewModel = viewModel,
+                navController = navController
+            )
+        }
+    } else {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = NeonPink)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PostDetailContent(
+    post: com.example.pm.Post,
+    viewModel: PostDetailViewModel,
+    navController: NavHostController
+) {
     val comments by viewModel.comments.collectAsState()
     val firstLiker by viewModel.firstLiker.collectAsState()
     val currentUserId = viewModel.currentUserId
@@ -62,10 +112,6 @@ fun PostDetailScreen(
     
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    LaunchedEffect(postId) {
-        viewModel.loadPost(postId)
-    }
-
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -73,7 +119,7 @@ fun PostDetailScreen(
             text = { Text("¿Estás seguro de que quieres eliminar esta publicación?") },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.deletePost(postId) {
+                    viewModel.deletePost(post.id) {
                         showDeleteDialog = false
                         navController.popBackStack()
                     }
@@ -98,9 +144,9 @@ fun PostDetailScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        UserAvatar(post?.userPhotoUrl, post?.username ?: "", 32.dp)
+                        UserAvatar(post.userPhotoUrl, post.username, 32.dp)
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text(post?.username ?: "Cargando...", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(post.username, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 },
                 navigationIcon = {
@@ -109,7 +155,7 @@ fun PostDetailScreen(
                     }
                 },
                 actions = {
-                    if (post?.userId == currentUserId) {
+                    if (post.userId == currentUserId) {
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(Icons.Default.MoreVert, null, tint = Color.White)
                         }
@@ -122,7 +168,7 @@ fun PostDetailScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 item {
-                    post?.let { p ->
+                    post.let { p ->
                         Column(modifier = Modifier.fillMaxWidth()) {
                             if (p.caption.isNotEmpty()) {
                                 Text(
@@ -134,9 +180,9 @@ fun PostDetailScreen(
                                 )
                             }
 
-                            Box(modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp).background(Color.Black), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp).background(Color.Black), contentAlignment = Alignment.Center) {
                                 if (p.videoUrl != null) {
-                                    VideoPlayer(videoUrl = p.videoUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp))
+                                    VideoPlayer(videoUrl = p.videoUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp))
                                 } else {
                                     SubcomposeAsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
@@ -144,7 +190,7 @@ fun PostDetailScreen(
                                             .crossfade(true)
                                             .build(),
                                         contentDescription = null,
-                                        modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
+                                        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
                                         contentScale = ContentScale.Fit,
                                         loading = { Box(Modifier.fillMaxWidth().aspectRatio(1f).background(Color.DarkGray)) }
                                     )
@@ -156,7 +202,7 @@ fun PostDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 val isLiked = p.likedBy.contains(currentUserId)
-                                IconButton(onClick = { viewModel.toggleLike(postId) }) {
+                                IconButton(onClick = { viewModel.toggleLike(post.id) }) {
                                     Icon(
                                         imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                         contentDescription = null,
@@ -255,7 +301,7 @@ fun PostDetailScreen(
                             value = commentText,
                             onValueChange = { commentText = it },
                             modifier = Modifier.weight(1f).focusRequester(focusRequester),
-                            placeholder = { Text("Añadir un comentario para ${post?.username}...", color = Color.Gray, fontSize = 14.sp) },
+                            placeholder = { Text("Añadir un comentario para ${post.username}...", color = Color.Gray, fontSize = 14.sp) },
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
@@ -268,7 +314,7 @@ fun PostDetailScreen(
                         )
                         if (commentText.isNotBlank()) {
                             TextButton(onClick = {
-                                viewModel.addComment(postId, commentText)
+                                viewModel.addComment(post.id, commentText)
                                 commentText = ""
                                 focusManager.clearFocus()
                             }) {

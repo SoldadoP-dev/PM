@@ -151,7 +151,7 @@ fun OtherProfileScreen(
                     if (canSeeContent) {
                         items(posts, key = { it.id }) { post ->
                             Box(modifier = Modifier.aspectRatio(1f).clickable { 
-                                navController.navigate("postDetail/${post.id}")
+                                navController.navigate("postFeed/profile/${post.userId}/${post.id}")
                             }) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)

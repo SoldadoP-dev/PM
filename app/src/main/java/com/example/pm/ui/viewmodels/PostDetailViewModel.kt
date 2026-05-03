@@ -21,6 +21,12 @@ class PostDetailViewModel @Inject constructor(
 
     val currentUserId: String = auth.currentUser?.uid ?: ""
 
+    private val _feed = MutableStateFlow<List<Post>>(emptyList())
+    val feed: StateFlow<List<Post>> = _feed
+
+    private val _initialPage = MutableStateFlow(-1)
+    val initialPage: StateFlow<Int> = _initialPage
+
     private val _post = MutableStateFlow<Post?>(null)
     val post: StateFlow<Post?> = _post
 
@@ -46,16 +52,43 @@ class PostDetailViewModel @Inject constructor(
         }
     }
 
-    fun loadPost(postId: String) {
+    fun loadFeed(contextStr: String, userId: String, initialPostId: String) {
         viewModelScope.launch {
-            val p = repository.getPost(postId)
-            _post.value = p
-            if (p != null && p.likedBy.isNotEmpty()) {
-                _firstLiker.value = repository.getOtherUser(p.likedBy.first())
+            if (contextStr == "explore") {
+                repository.getGlobalPosts().collect { list ->
+                    _feed.value = list
+                    if (_initialPage.value == -1) {
+                        _initialPage.value = list.indexOfFirst { it.id == initialPostId }.coerceAtLeast(0)
+                    }
+                }
+            } else if (contextStr == "profile") {
+                repository.getUserPosts(userId).collect { list ->
+                    _feed.value = list
+                    if (_initialPage.value == -1) {
+                        _initialPage.value = list.indexOfFirst { it.id == initialPostId }.coerceAtLeast(0)
+                    }
+                }
+            } else {
+                val p = repository.getPost(initialPostId)
+                if (p != null) {
+                    _feed.value = listOf(p)
+                    _initialPage.value = 0
+                }
+            }
+        }
+    }
+
+    fun onPageChanged(pagePost: Post) {
+        _post.value = pagePost
+        viewModelScope.launch {
+            if (pagePost.likedBy.isNotEmpty()) {
+                _firstLiker.value = repository.getOtherUser(pagePost.likedBy.first())
+            } else {
+                _firstLiker.value = null
             }
         }
         viewModelScope.launch {
-            repository.getComments(postId).collect {
+            repository.getComments(pagePost.id).collect {
                 _comments.value = it
             }
         }

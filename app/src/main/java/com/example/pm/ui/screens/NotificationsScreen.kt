@@ -178,7 +178,7 @@ fun NotificationsScreen(
                             } else {
                                 viewModel.markAsRead(notif.id)
                                 when(notif.type) {
-                                    "like", "comment", "comment_like" -> navController.navigate("postDetail/${notif.targetId}")
+                                    "like", "comment", "comment_like" -> navController.navigate("postFeed/single/none/${notif.targetId}")
                                     "message", "venue_invitation" -> {
                                         val encodedName = Uri.encode(notif.fromUsername)
                                         navController.navigate("chat/${notif.targetId}/$encodedName/${notif.fromUserId}")

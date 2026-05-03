@@ -113,7 +113,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 "like", "comment", "comment_like" -> {
-                    navController.navigate("postDetail/$targetId")
+                    navController.navigate("postFeed/single/none/$targetId")
                 }
                 "follow_request", "meetup_invitation" -> {
                     navController.navigate("notifications")
@@ -241,9 +241,16 @@ fun AppNavigation(navController: NavHostController, auth: FirebaseAuth) {
             StoryViewScreen(navController, userId)
         }
 
+        composable("postFeed/{context}/{userId}/{postId}") { backStackEntry ->
+            val context = backStackEntry.arguments?.getString("context") ?: "single"
+            val userId = backStackEntry.arguments?.getString("userId") ?: "none"
+            val postId = backStackEntry.arguments?.getString("postId") ?: ""
+            PostDetailScreen(navController, postId, context, userId)
+        }
+        
         composable("postDetail/{postId}") { backStackEntry ->
             val postId = backStackEntry.arguments?.getString("postId") ?: ""
-            PostDetailScreen(navController, postId)
+            PostDetailScreen(navController, postId, "single", "none")
         }
 
         composable("discoverPeople") { DiscoverPeopleScreen(navController) }

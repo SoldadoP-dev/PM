@@ -372,7 +372,7 @@ fun ProfilePostsGrid(posts: List<com.example.pm.Post>, navController: NavHostCon
                 model = post.imageUrl,
                 contentDescription = null,
                 modifier = Modifier.aspectRatio(1f).clickable { 
-                    navController.navigate("postDetail/${post.id}")
+                    navController.navigate("postFeed/profile/${post.userId}/${post.id}")
                 },
                 contentScale = ContentScale.Crop
             )
