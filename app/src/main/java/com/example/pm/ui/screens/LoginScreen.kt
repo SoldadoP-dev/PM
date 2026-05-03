@@ -3,16 +3,14 @@ package com.example.pm.ui.screens
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -58,11 +56,16 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        // Logo corregido: Sin recorte circular para que no se corte la copa
         Image(
             painter = painterResource(id = R.drawable.logo),
             contentDescription = "App Logo",
-            modifier = Modifier.size(120.dp).clip(CircleShape).border(2.dp, NeonPurple, CircleShape)
+            modifier = Modifier
+                .size(220.dp) // Un poco más grande ahora que no se corta
+                .padding(8.dp),
+            contentScale = ContentScale.Fit
         )
+        
         Spacer(modifier = Modifier.height(16.dp))
         Text(stringResource(R.string.app_name), fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = NeonPurple)
         Text(stringResource(R.string.slogan), color = Color.Gray, modifier = Modifier.padding(bottom = 48.dp))
@@ -72,7 +75,7 @@ fun LoginScreen(
             label = { Text(stringResource(R.string.email)) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray)
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray, focusedLabelColor = NeonPurple, cursorColor = NeonPurple)
         )
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
@@ -81,7 +84,7 @@ fun LoginScreen(
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray)
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray, focusedLabelColor = NeonPurple, cursorColor = NeonPurple)
         )
         Spacer(modifier = Modifier.height(32.dp))
         Button(

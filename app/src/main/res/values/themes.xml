@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Tema principal de la App -->
+    <style name="Theme.PM" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/black</item>
+        <item name="android:statusBarColor">@color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 
-    <style name="Theme.PM" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Tema para la pantalla de carga -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#000000</item>
+        <!-- Usamos splash_logo que tiene márgenes para que no se corte la copa -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.PM</item>
+    </style>
 </resources>
