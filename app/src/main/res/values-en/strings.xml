@@ -18,6 +18,8 @@
     <string name="no_one_yet">No one joined yet</string>
     <string name="join_me">I\'m in</string>
     <string name="im_going">I\'m going</string>
+    <string name="attending">Attending</string>
+    <string name="join">Join</string>
     <string name="your_story">Your story</string>
     <string name="story_uploaded">Story uploaded successfully</string>
     <string name="messages">Messages</string>
@@ -123,5 +125,28 @@
     <string name="current_password">Current password</string>
     <string name="new_password">New password</string>
     <string name="save_changes">Save Changes</string>
+    <string name="send_message_hint">Send message…</string>
+    <string name="typing">typing…</string>
+    <string name="change_plans_title">Change plans?</string>
+    <string name="change_plans_message">You are already attending %1$s. If you join %2$s, your previous reservation will be canceled.</string>
+    <string name="yes_change">Yes, change</string>
+    <string name="invite_friends_title">Invite friends?</string>
+    <string name="invite_friends_message">Do you want to send a join request to your followers and chats to join you at %1$s?</string>
+    <string name="yes">Yes</string>
+    <string name="not_now">Not now</string>
+    <string name="choose_tags_title">Choose up to 3 tags</string>
+    <string name="whats_the_plan">What\'s the plan today?</string>
+    <string name="confirm">Confirm</string>
+    <string name="tag_users_desc">Users who chose this tag:</string>
+    <string name="loading_users">Loading users…</string>
+    <string name="invite_to_meetup">Invite to meetup</string>
+    <string name="groups_label">GROUPS</string>
+    <string name="followers_label">FOLLOWERS</string>
+    <string name="already_attending">Already attending</string>
+    <string name="send_invitation">Send invitation</string>
+    <string name="search_by_name">Search by name…</string>
+    <string name="all_filter">All</string>
+    <string name="no_results">No results found</string>
+    <string name="you">You</string>
     <string name="profile_updated">Profile updated</string>
 </resources>

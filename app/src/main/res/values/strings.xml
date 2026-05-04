@@ -18,6 +18,8 @@
     <string name="no_one_yet">Nadie apuntado aún</string>
     <string name="join_me">Me apunto</string>
     <string name="im_going">Voy a ir</string>
+    <string name="attending">Apuntado</string>
+    <string name="join">Apuntarse</string>
     <string name="your_story">Tu historia</string>
     <string name="story_uploaded">Historia subida correctamente</string>
     <string name="messages">Mensajes</string>
@@ -123,5 +125,28 @@
     <string name="current_password">Contraseña actual</string>
     <string name="new_password">Nueva contraseña</string>
     <string name="save_changes">Guardar Cambios</string>
+    <string name="send_message_hint">Enviar mensaje…</string>
+    <string name="typing">escribiendo…</string>
+    <string name="change_plans_title">¿Cambiar de planes?</string>
+    <string name="change_plans_message">Ya estás apuntado en %1$s. Si te unes a %2$s, se cancelará tu reserva anterior.</string>
+    <string name="yes_change">Sí, cambiar</string>
+    <string name="invite_friends_title">¿Invitar amigos?</string>
+    <string name="invite_friends_message">¿Quieres mandar una solicitud de unión a tus seguidores y chats para que se unan a ti en %1$s?</string>
+    <string name="yes">Sí</string>
+    <string name="not_now">Ahora no</string>
+    <string name="choose_tags_title">Elige hasta 3 etiquetas</string>
+    <string name="whats_the_plan">¿Qué plan hay hoy?</string>
+    <string name="confirm">Confirmar</string>
+    <string name="tag_users_desc">Usuarios que eligieron esta etiqueta:</string>
+    <string name="loading_users">Cargando usuarios…</string>
+    <string name="invite_to_meetup">Invitar a la quedada</string>
+    <string name="groups_label">GRUPOS</string>
+    <string name="followers_label">SEGUIDORES</string>
+    <string name="already_attending">Ya está apuntado</string>
+    <string name="send_invitation">Enviar invitación</string>
+    <string name="search_by_name">Buscar por nombre…</string>
+    <string name="all_filter">Todos</string>
+    <string name="no_results">No se han encontrado resultados</string>
+    <string name="you">Tú</string>
     <string name="profile_updated">Perfil actualizado</string>
 </resources>

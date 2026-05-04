@@ -88,11 +88,11 @@ fun VenueDetailSheet(
     if (showAttendanceConflictDialog) {
         AlertDialog(
             onDismissRequest = { showAttendanceConflictDialog = false },
-            title = { Text(text = "¿Cambiar de planes?", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+            title = { Text(text = stringResource(R.string.change_plans_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
             text = {
-                val otherName = otherVenueAttendance?.name ?: "otra discoteca"
+                val otherName = otherVenueAttendance?.name ?: stringResource(R.string.group_default_name)
                 Text(
-                    text = "Ya estás apuntado en $otherName. Si te unes a ${venue.name}, se cancelará tu reserva anterior.",
+                    text = stringResource(R.string.change_plans_message, otherName, venue.name),
                     color = Color.LightGray,
                     fontSize = 16.sp
                 )
@@ -106,12 +106,12 @@ fun VenueDetailSheet(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
                 ) {
-                    Text("Sí, cambiar", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.yes_change), color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAttendanceConflictDialog = false }) {
-                    Text("Cancelar", color = Color.Gray)
+                    Text(stringResource(R.string.cancel), color = Color.Gray)
                 }
             },
             containerColor = CardGray,
@@ -123,10 +123,10 @@ fun VenueDetailSheet(
     if (showInviteConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showInviteConfirmDialog = false },
-            title = { Text(text = "¿Invitar amigos?", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+            title = { Text(text = stringResource(R.string.invite_friends_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    text = "¿Quieres mandar una solicitud de unión a tus seguidores y chats para que se unan a ti en ${venue.name}?",
+                    text = stringResource(R.string.invite_friends_message, venue.name),
                     color = Color.LightGray,
                     fontSize = 16.sp
                 )
@@ -139,12 +139,12 @@ fun VenueDetailSheet(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
                 ) {
-                    Text("Si", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.yes), color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showInviteConfirmDialog = false }) {
-                    Text("Ahora no", color = Color.Gray)
+                    Text(stringResource(R.string.not_now), color = Color.Gray)
                 }
             },
             containerColor = CardGray,
@@ -253,7 +253,7 @@ fun VenueDetailSheet(
                     modifier = Modifier.weight(1f),
                     decorationBox = { innerTextField ->
                         if (participantSearchQuery.isEmpty()) {
-                            Text("Buscar por nombre...", color = Color.Gray, fontSize = 14.sp)
+                            Text(stringResource(R.string.search_by_name), color = Color.Gray, fontSize = 14.sp)
                         }
                         innerTextField()
                     }
@@ -271,7 +271,7 @@ fun VenueDetailSheet(
                     FilterChip(
                         selected = selectedTagFilter == null,
                         onClick = { selectedTagFilter = null },
-                        label = { Text("Todos", fontSize = 12.sp) },
+                        label = { Text(stringResource(R.string.all_filter), fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = NeonPurple,
                             containerColor = Color.DarkGray,
@@ -304,13 +304,13 @@ fun VenueDetailSheet(
             items(filteredAttendees) { attendee ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { navController.navigate("otherProfile/${attendee.uid}") }) {
                     UserAvatar(attendee.photoUrl, attendee.username, size = 50.dp)
-                    Text(if (attendee.uid == viewModel.currentUserId) "Tú" else attendee.username, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
+                    Text(if (attendee.uid == viewModel.currentUserId) stringResource(R.string.you) else attendee.username, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
                 }
             }
             if (filteredAttendees.isEmpty()) {
                 item { 
                     Text(
-                        text = if (participantSearchQuery.isEmpty()) stringResource(R.string.no_one_yet) else "No se han encontrado resultados", 
+                        text = if (participantSearchQuery.isEmpty()) stringResource(R.string.no_one_yet) else stringResource(R.string.no_results), 
                         color = Color.DarkGray, 
                         fontSize = 14.sp 
                     ) 
@@ -374,8 +374,8 @@ fun TagSelectionDialog(
             colors = CardDefaults.cardColors(containerColor = CardGray)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Elige hasta 3 etiquetas", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("¿Qué plan hay hoy?", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 16.dp))
+                Text(stringResource(R.string.choose_tags_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.whats_the_plan), color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 16.dp))
                 
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -406,14 +406,14 @@ fun TagSelectionDialog(
 
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 24.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancelar", color = Color.Gray)
+                        Text(stringResource(R.string.cancel), color = Color.Gray)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { onConfirm(selected) },
                         colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
                     ) {
-                        Text("Confirmar", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.confirm), color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -447,7 +447,7 @@ fun TagUsersDialog(
                         Icon(Icons.Default.Close, null, tint = Color.Gray)
                     }
                 }
-                Text("Usuarios que eligieron esta etiqueta:", color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(bottom = 16.dp))
+                Text(stringResource(R.string.tag_users_desc), color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(bottom = 16.dp))
                 
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
                     items(users) { user ->
@@ -460,7 +460,7 @@ fun TagUsersDialog(
                     }
                     if (users.isEmpty()) {
                         item {
-                            Text("Cargando usuarios...", color = Color.DarkGray, modifier = Modifier.padding(vertical = 16.dp))
+                            Text(stringResource(R.string.loading_users), color = Color.DarkGray, modifier = Modifier.padding(vertical = 16.dp))
                         }
                     }
                 }
@@ -488,7 +488,7 @@ fun InviteSelectionDialog(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A))
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text("Invitar a la quedada", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.invite_to_meetup), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 
                 // Search Bar
                 Box(
@@ -510,7 +510,7 @@ fun InviteSelectionDialog(
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                             decorationBox = { innerTextField ->
-                                if (searchQuery.isEmpty()) Text("Buscar...", color = Color.Gray, fontSize = 15.sp)
+                                if (searchQuery.isEmpty()) Text(stringResource(R.string.search_hint), color = Color.Gray, fontSize = 15.sp)
                                 innerTextField()
                             }
                         )
@@ -524,7 +524,7 @@ fun InviteSelectionDialog(
                     }
                     if (filteredChats.isNotEmpty()) {
                         item {
-                            Text("GRUPOS", color = NeonPurple, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 8.dp))
+                            Text(stringResource(R.string.groups_label), color = NeonPurple, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 8.dp))
                         }
                         items(filteredChats) { chat ->
                             val isSelected = selectedChatIds.contains(chat.id)
@@ -537,7 +537,7 @@ fun InviteSelectionDialog(
                             ) {
                                 UserAvatar(chat.photoUrl, chat.name ?: "?", 40.dp)
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text(chat.name ?: "Grupo", color = Color.White, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                Text(chat.name ?: stringResource(R.string.group_default_name), color = Color.White, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                                 Checkbox(
                                     checked = isSelected,
                                     onCheckedChange = null,
@@ -553,7 +553,7 @@ fun InviteSelectionDialog(
                     }
                     if (filteredFollowers.isNotEmpty()) {
                         item {
-                            Text("SEGUIDORES", color = NeonPurple, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
+                            Text(stringResource(R.string.followers_label), color = NeonPurple, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
                         }
                         items(filteredFollowers) { user ->
                             val isAttending = venueAttendeeUids.contains(user.uid)
@@ -573,7 +573,7 @@ fun InviteSelectionDialog(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(user.username, color = if (isAttending) Color.Gray else Color.White, fontWeight = FontWeight.Medium)
                                     if (isAttending) {
-                                        Text("Ya está apuntado", color = NeonPurple, fontSize = 11.sp)
+                                        Text(stringResource(R.string.already_attending), color = NeonPurple, fontSize = 11.sp)
                                     }
                                 }
                                 if (!isAttending) {
@@ -596,14 +596,14 @@ fun InviteSelectionDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancelar", color = Color.Gray)
+                        Text(stringResource(R.string.cancel), color = Color.Gray)
                     }
                     Button(
                         onClick = { onSend(selectedUserIds.toList(), selectedChatIds.toList()) },
                         enabled = selectedUserIds.isNotEmpty() || selectedChatIds.isNotEmpty(),
                         colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
                     ) {
-                        Text("Enviar invitación", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.send_invitation), color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }

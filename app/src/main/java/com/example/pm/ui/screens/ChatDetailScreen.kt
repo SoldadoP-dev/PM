@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.pm.Message
+import com.example.pm.R
 import com.example.pm.ui.components.UserAvatar
 import com.example.pm.ui.components.VideoPlayer
 import com.example.pm.ui.theme.CardGray
@@ -105,11 +107,11 @@ fun ChatDetailScreen(
     if (showConflictDialogForInvite != null) {
         AlertDialog(
             onDismissRequest = { showConflictDialogForInvite = null },
-            title = { Text(text = "¿Cambiar de planes?", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+            title = { Text(text = stringResource(R.string.change_plans_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
             text = {
-                val otherNameText = otherVenueAttendance?.name ?: "otra discoteca"
+                val otherNameText = otherVenueAttendance?.name ?: stringResource(R.string.group_default_name)
                 Text(
-                    text = "Ya estás apuntado en $otherNameText. Si te unes a esta quedada, se cancelará tu reserva anterior.",
+                    text = stringResource(R.string.change_plans_message, otherNameText, "esta quedada"),
                     color = Color.LightGray,
                     fontSize = 16.sp
                 )
@@ -124,12 +126,12 @@ fun ChatDetailScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
                 ) {
-                    Text("Sí, cambiar", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.yes_change), color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showConflictDialogForInvite = null }) {
-                    Text("Cancelar", color = Color.Gray)
+                    Text(stringResource(R.string.cancel), color = Color.Gray)
                 }
             },
             containerColor = CardGray,
@@ -184,7 +186,7 @@ fun ChatDetailScreen(
                         Column {
                             Text(if (chatRoom?.isGroup == true) chatRoom?.name ?: otherName else otherName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                             if (isOtherTyping && chatRoom?.isGroup != true) {
-                                Text("escribiendo...", fontSize = 12.sp, color = NeonPurple)
+                                Text(stringResource(R.string.typing), fontSize = 12.sp, color = NeonPurple)
                             }
                         }
                     }
@@ -210,7 +212,7 @@ fun ChatDetailScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         if (text.isEmpty()) {
-                            Text("Enviar mensaje...", color = Color.Gray)
+                            Text(stringResource(R.string.send_message_hint), color = Color.Gray)
                         }
                         BasicTextField(
                             value = text,
@@ -341,7 +343,7 @@ fun ChatBubble(
                             Spacer(modifier = Modifier.width(4.dp))
                         }
                         Text(
-                            if (isAlreadyAttending) "Apuntado" else "Apuntarse", 
+                            if (isAlreadyAttending) stringResource(R.string.attending) else stringResource(R.string.join),
                             color = if (isAlreadyAttending) Color.White else Color.Black, 
                             fontWeight = FontWeight.Bold, 
                             fontSize = 14.sp
