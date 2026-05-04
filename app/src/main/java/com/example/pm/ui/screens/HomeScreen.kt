@@ -280,7 +280,7 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.MyLocation, "Mi ubicación", tint = NeonPurple, modifier = Modifier.size(24.dp))
+                Icon(Icons.Default.MyLocation, stringResource(R.string.my_location), tint = NeonPurple, modifier = Modifier.size(24.dp))
             }
         }
 
@@ -293,7 +293,7 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
                 colors = CardDefaults.cardColors(containerColor = NeonPink.copy(alpha = 0.9f))
             ) {
                 Text(
-                    text = "Habilita la localización para disfrutar de las recomendaciones cercanas.",
+                    text = stringResource(R.string.location_permission_denied),
                     color = Color.White,
                     modifier = Modifier.padding(16.dp),
                     fontSize = 14.sp
@@ -384,7 +384,7 @@ fun MapSection(onVenueClick: (Venue) -> Unit, viewModel: HomeViewModel) {
             onCreate = { name, selectedIds, photoUri ->
                 viewModel.createMeetup(name, selectedIds, photoUri)
                 showMeetupDialog = false
-                Toast.makeText(context, "¡Quedada enviada!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.meetup_sent), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -413,7 +413,7 @@ fun CreateMeetupDialog(
         onDismissRequest = onDismiss,
         containerColor = DeepSpace,
         tonalElevation = 8.dp,
-        title = { Text("Nueva Quedada", color = Color.White, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.new_meetup), color = Color.White, fontWeight = FontWeight.Bold) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Selector de imagen de la quedada
@@ -443,7 +443,7 @@ fun CreateMeetupDialog(
                 OutlinedTextField(
                     value = meetupName,
                     onValueChange = { meetupName = it },
-                    label = { Text("¿Cómo se llama el plan?", color = Color.Gray) },
+                    label = { Text(stringResource(R.string.meetup_name_hint), color = Color.Gray) },
                     textStyle = TextStyle(color = Color.White),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -475,7 +475,7 @@ fun CreateMeetupDialog(
                             modifier = Modifier.weight(1f),
                             decorationBox = { innerTextField ->
                                 if (participantSearch.isEmpty()) {
-                                    Text("Buscar amigos...", color = Color.Gray, fontSize = 15.sp)
+                                    Text(stringResource(R.string.search_friends), color = Color.Gray, fontSize = 15.sp)
                                 }
                                 innerTextField()
                             }
@@ -493,7 +493,7 @@ fun CreateMeetupDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "Invitados (${selectedUserIds.size}):", 
+                    stringResource(R.string.guests_count, selectedUserIds.size), 
                     color = Color.White, 
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
@@ -553,7 +553,7 @@ fun CreateMeetupDialog(
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
             ) {
-                Text("CREAR QUEDADA", fontWeight = FontWeight.ExtraBold)
+                Text(stringResource(R.string.create_meetup_button), fontWeight = FontWeight.ExtraBold)
             }
         },
         dismissButton = {
@@ -561,7 +561,7 @@ fun CreateMeetupDialog(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Cerrar", color = Color.Gray)
+                Text(stringResource(R.string.close), color = Color.Gray)
             }
         }
     )

@@ -1,5 +1,6 @@
 package com.example.pm.ui.screens
 
+import android.app.Activity
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -56,10 +57,10 @@ fun SettingsScreen(
     if (showDeleteWarning) {
         AlertDialog(
             onDismissRequest = { showDeleteWarning = false },
-            title = { Text(text = "¿Borrar cuenta?", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+            title = { Text(text = stringResource(R.string.delete_account_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    text = "Esta acción es irreversible. Se borrarán todos tus datos y publicaciones. ¿Deseas continuar?",
+                    text = stringResource(R.string.delete_account_message),
                     color = Color.LightGray,
                     fontSize = 16.sp
                 )
@@ -72,12 +73,12 @@ fun SettingsScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = softRed)
                 ) {
-                    Text("Continuar", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.continue_label), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteWarning = false }) {
-                    Text("Cancelar", color = Color.Gray)
+                    Text(stringResource(R.string.cancel), color = Color.Gray)
                 }
             },
             containerColor = Color(0xFF1C1C1C),
@@ -89,14 +90,14 @@ fun SettingsScreen(
     if (showPasswordDialog) {
         AlertDialog(
             onDismissRequest = { showPasswordDialog = false },
-            title = { Text(text = "Confirmar contraseña", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+            title = { Text(text = stringResource(R.string.confirm_password_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text("Por seguridad, introduce tu contraseña para borrar la cuenta.", color = Color.LightGray, modifier = Modifier.padding(bottom = 16.dp))
+                    Text(stringResource(R.string.confirm_password_message), color = Color.LightGray, modifier = Modifier.padding(bottom = 16.dp))
                     TextField(
                         value = passwordToDelete,
                         onValueChange = { passwordToDelete = it },
-                        placeholder = { Text("Contraseña", color = Color.Gray) },
+                        placeholder = { Text(stringResource(R.string.password), color = Color.Gray) },
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
                         colors = TextFieldDefaults.colors(
@@ -123,12 +124,12 @@ fun SettingsScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = softRed)
                 ) {
-                    Text("Borrar permanentemente", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.delete_permanently), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showPasswordDialog = false }) {
-                    Text("Cancelar", color = Color.Gray)
+                    Text(stringResource(R.string.cancel), color = Color.Gray)
                 }
             },
             containerColor = Color(0xFF1C1C1C),
@@ -150,7 +151,7 @@ fun SettingsScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().background(DeepSpace).padding(padding).padding(16.dp)) {
-            Text("Preferencias de la App", color = NeonPurple, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
+            Text(stringResource(R.string.app_preferences), color = NeonPurple, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
             
             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (isDarkMap) Icons.Default.DarkMode else Icons.Default.LightMode, null, tint = Color.White)
@@ -175,6 +176,8 @@ fun SettingsScreen(
                     onCheckedChange = {
                         isEnglish = it
                         sharedPrefs.edit().putBoolean("is_english", it).apply()
+                        // Recreamos la actividad para aplicar el idioma globalmente
+                        (context as? Activity)?.recreate()
                     },
                     colors = SwitchDefaults.colors(checkedThumbColor = NeonPurple, checkedTrackColor = NeonPurple.copy(alpha = 0.5f))
                 )
@@ -208,7 +211,7 @@ fun SettingsScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Logout, null, tint = Color.Red)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Cerrar sesión", color = Color.Red, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.logout), color = Color.Red, fontWeight = FontWeight.Bold)
                 }
 
                 Button(
@@ -217,7 +220,7 @@ fun SettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = softRed),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Borrar cuenta", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.delete_account), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }

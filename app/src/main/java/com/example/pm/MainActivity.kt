@@ -1,5 +1,7 @@
 package com.example.pm
 
+import android.content.Context
+import com.example.pm.utils.LocaleHelper
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -50,6 +52,10 @@ class MainActivity : ComponentActivity() {
         if (!isGranted) {
             Toast.makeText(this, getString(R.string.notifications_off), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.updateLocale(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

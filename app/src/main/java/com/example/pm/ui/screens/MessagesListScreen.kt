@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -41,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.pm.ChatRoom
+import com.example.pm.R
 import com.example.pm.User
 import com.example.pm.ui.components.UserAvatar
 import com.example.pm.ui.theme.InstaGradient
@@ -74,19 +76,19 @@ fun MessagesListScreen(
     if (chatToDelete != null) {
         AlertDialog(
             onDismissRequest = { chatToDelete = null },
-            title = { Text("Eliminar chat") },
-            text = { Text("¿Estás seguro de que quieres eliminar este chat?") },
+            title = { Text(stringResource(R.string.delete_chat_title)) },
+            text = { Text(stringResource(R.string.delete_chat_confirm)) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteChat(chatToDelete!!.id)
                     chatToDelete = null
                 }) {
-                    Text("Eliminar", color = NeonPink)
+                    Text(stringResource(R.string.delete), color = NeonPink)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { chatToDelete = null }) {
-                    Text("Cancelar", color = Color.Gray)
+                    Text(stringResource(R.string.cancel), color = Color.Gray)
                 }
             },
             containerColor = Color(0xFF1C1C1C),
@@ -109,7 +111,7 @@ fun MessagesListScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = user?.username ?: "Cargando...",
+                    text = user?.username ?: stringResource(R.string.loading),
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
@@ -137,7 +139,7 @@ fun MessagesListScreen(
                         singleLine = true,
                         decorationBox = { innerTextField ->
                             if (searchQuery.isEmpty()) {
-                                Text("Buscar...", color = Color.Gray, fontSize = 14.sp)
+                                Text(stringResource(R.string.search_hint), color = Color.Gray, fontSize = 14.sp)
                             }
                             innerTextField()
                         }
@@ -198,7 +200,7 @@ fun MessagesListScreen(
                                 Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(14.dp))
                             }
                         }
-                        Text("Tu historia", color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                        Text(stringResource(R.string.your_story), color = Color.Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
 
@@ -247,9 +249,9 @@ fun MessagesListScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Mensajes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(stringResource(R.string.messages), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(
-                    text = "Solicitudes", 
+                    text = stringResource(R.string.requests_label), 
                     color = NeonPurple,
                     fontWeight = FontWeight.Bold, 
                     fontSize = 14.sp,
@@ -288,7 +290,7 @@ fun MessagesListScreen(
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(16.dp))
-                    Text("Publicando...", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.publishing), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -309,7 +311,7 @@ fun EnrichedChatItemWithFilter(
     var unreadCount by remember { mutableIntStateOf(0) }
 
     if (chat.isGroup) {
-        val groupName = chat.name ?: "Quedada"
+        val groupName = chat.name ?: stringResource(R.string.group_default_name)
         if (searchQuery.isEmpty() || groupName.contains(searchQuery, ignoreCase = true)) {
             Row(
                 modifier = Modifier

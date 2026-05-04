@@ -56,7 +56,7 @@ fun NotificationsScreen(
             TopAppBar(
                 title = { 
                     if (isSelectionMode) {
-                        Text("${selectedNotifs.size} seleccionados", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.selected_count, selectedNotifs.size), fontWeight = FontWeight.Bold)
                     } else {
                         Text(stringResource(R.string.activity), fontWeight = FontWeight.Bold) 
                     }
@@ -117,7 +117,7 @@ fun NotificationsScreen(
             // SECCIÓN DE SOLICITUDES
             if (requests.isNotEmpty()) {
                 item {
-                    SectionHeader("Solicitudes de seguimiento")
+                    SectionHeader(stringResource(R.string.follow_requests_title))
                 }
                 items(requests, key = { it.id }) { notif ->
                     NotificationItem(
@@ -148,13 +148,13 @@ fun NotificationsScreen(
 
             // SECCIÓN DE ACTIVIDAD GENERAL
             item {
-                SectionHeader("Actividad reciente")
+                SectionHeader(stringResource(R.string.recent_activity_title))
             }
             
             if (generalNotifs.isEmpty()) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("No hay actividad nueva", color = Color.Gray, fontSize = 14.sp)
+                        Text(stringResource(R.string.no_activity), color = Color.Gray, fontSize = 14.sp)
                     }
                 }
             } else {
@@ -251,12 +251,12 @@ fun NotificationItem(
         headlineContent = { 
             Text(
                 text = when(notif.type) {
-                    "follow_request" -> "${notif.fromUsername} quiere seguirte"
-                    "like" -> "${notif.fromUsername} le dio like a tu post"
-                    "comment" -> "${notif.fromUsername} comentó tu post"
-                    "comment_like" -> "A ${notif.fromUsername} le gusta tu respuesta"
-                    "message" -> "${notif.fromUsername} te envió un mensaje"
-                    "meetup_invitation", "venue_invitation" -> "${notif.fromUsername} te invitó a una quedada"
+                    "follow_request" -> stringResource(R.string.notif_follow_request, notif.fromUsername)
+                    "like" -> stringResource(R.string.notif_like, notif.fromUsername)
+                    "comment" -> stringResource(R.string.notif_comment, notif.fromUsername)
+                    "comment_like" -> stringResource(R.string.notif_comment_like, notif.fromUsername)
+                    "message" -> stringResource(R.string.notif_message, notif.fromUsername)
+                    "meetup_invitation", "venue_invitation" -> stringResource(R.string.notif_meetup, notif.fromUsername)
                     else -> notif.fromUsername
                 },
                 fontWeight = if (!notif.isRead) FontWeight.ExtraBold else FontWeight.Normal, 
@@ -268,9 +268,9 @@ fun NotificationItem(
             Text(
                 text = when(notif.type) {
                     "comment", "message", "meetup_invitation", "venue_invitation" -> notif.content
-                    "like", "comment_like" -> "Toca para ver la publicación"
-                    "follow_request" -> "Toca para ver el perfil"
-                    else -> "Nueva actividad"
+                    "like", "comment_like" -> stringResource(R.string.tap_to_view_post)
+                    "follow_request" -> stringResource(R.string.tap_to_view_profile)
+                    else -> stringResource(R.string.new_activity_label)
                 },
                 color = Color.Gray,
                 fontSize = 12.sp,
@@ -313,7 +313,7 @@ fun NotificationItem(
                             modifier = Modifier.height(32.dp),
                             shape = CircleShape
                         ) {
-                            Text("Ver", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(stringResource(R.string.view_label), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
@@ -365,22 +365,22 @@ fun MeetupPreviewDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Invitación a Quedada", color = Color.White, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.meetup_invitation_title), color = Color.White, fontWeight = FontWeight.Bold) },
         text = { 
             Column {
                 Text(notif.content, color = Color.LightGray, fontSize = 15.sp)
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Al aceptar, entrarás en el grupo de chat para poder ver los mensajes y detalles.", color = Color.Gray, fontSize = 13.sp)
+                Text(stringResource(R.string.meetup_invitation_desc), color = Color.Gray, fontSize = 13.sp)
             }
         },
         confirmButton = {
             Button(onClick = onAccept, colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)) { 
-                Text("Aceptar", color = Color.White, fontWeight = FontWeight.Bold) 
+                Text(stringResource(R.string.accept), color = Color.White, fontWeight = FontWeight.Bold) 
             }
         },
         dismissButton = {
             TextButton(onClick = onDecline) { 
-                Text("Rechazar", color = Color.Gray) 
+                Text(stringResource(R.string.decline), color = Color.Gray)
             }
         },
         containerColor = DeepSpace

@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -166,11 +167,11 @@ fun ProfileScreen(
                                     modifier = Modifier.weight(1f),
                                     horizontalArrangement = Arrangement.SpaceEvenly
                                 ) {
-                                    ProfileStat(posts.size.toString(), "publicaciones") {}
-                                    ProfileStat(user?.followersCount?.toString() ?: "0", "seguidores") { 
+                                    ProfileStat(posts.size.toString(), stringResource(R.string.publicaciones)) {}
+                                    ProfileStat(user?.followersCount?.toString() ?: "0", stringResource(R.string.followers_count)) { 
                                         rootNavController.navigate("userList/followers/${user?.uid}") 
                                     }
-                                    ProfileStat(user?.followingCount?.toString() ?: "0", "seguidos") { 
+                                    ProfileStat(user?.followingCount?.toString() ?: "0", stringResource(R.string.following_count_label)) { 
                                         rootNavController.navigate("userList/following/${user?.uid}") 
                                     }
                                 }
@@ -205,23 +206,23 @@ fun ProfileScreen(
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
-                                    Text("Editar perfil", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text(stringResource(R.string.edit_profile_button), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                                 Button(
                                     onClick = { 
                                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                             type = "text/plain"
-                                            putExtra(Intent.EXTRA_SUBJECT, "Mira mi perfil en PM")
-                                            putExtra(Intent.EXTRA_TEXT, "¡Hola! Sígueme en PM: https://pm.app/user/${user?.username}")
+                                            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_subject))
+                                            putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_text, user?.username))
                                         }
-                                        context.startActivity(Intent.createChooser(shareIntent, "Compartir perfil via"))
+                                        context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_chooser)))
                                     },
                                     modifier = Modifier.weight(1f).height(32.dp),
                                     shape = RoundedCornerShape(8.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF262626)),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
-                                    Text("Compartir", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text(stringResource(R.string.share), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                                 Button(
                                     onClick = { galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
@@ -246,9 +247,9 @@ fun ProfileScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Descubre personas", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(stringResource(R.string.discover_people), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                     Text(
-                                        "Ver todo", 
+                                        stringResource(R.string.view_all), 
                                         color = Color(0xFF833AB4),
                                         fontWeight = FontWeight.Bold, 
                                         fontSize = 14.sp,
@@ -310,14 +311,14 @@ fun ProfileScreen(
                             if (page == 0) {
                                 val photoPosts = posts.filter { it.videoUrl == null }
                                 if (photoPosts.isEmpty()) {
-                                    ProfileEmptyState("No hay fotos aún", galleryLauncher)
+                                    ProfileEmptyState(stringResource(R.string.no_photos_yet), galleryLauncher)
                                 } else {
                                     ProfilePostsGrid(photoPosts, rootNavController)
                                 }
                             } else {
                                 val videoPosts = posts.filter { it.videoUrl != null }
                                 if (videoPosts.isEmpty()) {
-                                    ProfileEmptyState("Todavía no hay vídeos", galleryLauncher)
+                                    ProfileEmptyState(stringResource(R.string.no_videos_yet), galleryLauncher)
                                 } else {
                                     ProfilePostsGrid(videoPosts, rootNavController)
                                 }
@@ -350,7 +351,7 @@ fun ProfileScreen(
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(16.dp))
-                        Text("Publicando...", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.publishing), color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -394,7 +395,7 @@ fun ProfileEmptyState(text: String, launcher: androidx.activity.result.ActivityR
             border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray),
             shape = RoundedCornerShape(8.dp)
         ) {
-            Text("Publicar", color = Color.White)
+            Text(stringResource(R.string.post), color = Color.White)
         }
     }
 }
@@ -441,9 +442,9 @@ fun SuggestedUserCard(
                     modifier = Modifier.clickable { onUserClick() }
                 )
                 val mutualText = when {
-                    mutualCount == 0 -> "Sin amigos en comun"
-                    mutualCount == 1 -> "1 amigo en común"
-                    else -> "$mutualCount amigos en común"
+                    mutualCount == 0 -> stringResource(R.string.no_mutual_friends)
+                    mutualCount == 1 -> stringResource(R.string.one_mutual_friend)
+                    else -> stringResource(R.string.mutual_friends_count, mutualCount)
                 }
                 Text(
                     mutualText, 
@@ -464,7 +465,7 @@ fun SuggestedUserCard(
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Text(
-                        if (isSent) "Solicitado" else "Seguir", 
+                        if (isSent) stringResource(R.string.requested) else stringResource(R.string.follow),
                         color = if (isSent) Color.Gray else Color.White, 
                         fontWeight = FontWeight.Bold, 
                         fontSize = 12.sp

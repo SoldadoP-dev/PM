@@ -81,7 +81,7 @@ fun ExploreScreen(
                         singleLine = true,
                         decorationBox = { innerTextField ->
                             if (searchQueryText.isEmpty()) {
-                                Text("Buscar...", color = Color.Gray, fontSize = 16.sp)
+                                Text(stringResource(R.string.search_hint), color = Color.Gray, fontSize = 16.sp)
                             }
                             innerTextField()
                         }
@@ -107,7 +107,7 @@ fun ExploreScreen(
                 }
             } else if (posts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No hay publicaciones", color = Color.Gray, fontSize = 16.sp)
+                    Text(stringResource(R.string.no_posts_available), color = Color.Gray, fontSize = 16.sp)
                 }
             } else {
                 // Grid de 3 columnas estilo Explorar Real

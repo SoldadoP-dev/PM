@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import com.example.pm.R
 import com.example.pm.ui.theme.*
 import com.example.pm.ui.viewmodels.ProfileViewModel
 
@@ -69,7 +71,7 @@ fun EditProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Editar Perfil", color = Color.White) },
+                title = { Text(stringResource(R.string.edit_profile), color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
@@ -130,7 +132,7 @@ fun EditProfileScreen(
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Nombre de usuario") },
+                label = { Text(stringResource(R.string.username)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -146,7 +148,7 @@ fun EditProfileScreen(
             OutlinedTextField(
                 value = bio,
                 onValueChange = { bio = it },
-                label = { Text("Biografía") },
+                label = { Text(stringResource(R.string.bio)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -173,9 +175,9 @@ fun EditProfileScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Cuenta Privada", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.private_account), color = Color.White, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Solo tus seguidores podrán ver tus publicaciones",
+                            stringResource(R.string.private_account_desc),
                             color = Color.Gray,
                             fontSize = 12.sp
                         )
@@ -208,7 +210,7 @@ fun EditProfileScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Cambiar Contraseña", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.change_password), color = Color.White, fontWeight = FontWeight.SemiBold)
                         Icon(
                             imageVector = if (showPasswordSection) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             contentDescription = null,
@@ -221,7 +223,7 @@ fun EditProfileScreen(
                             OutlinedTextField(
                                 value = currentPassword,
                                 onValueChange = { currentPassword = it },
-                                label = { Text("Contraseña actual") },
+                                label = { Text(stringResource(R.string.current_password)) },
                                 visualTransformation = PasswordVisualTransformation(),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -235,7 +237,7 @@ fun EditProfileScreen(
                             OutlinedTextField(
                                 value = newPassword,
                                 onValueChange = { newPassword = it },
-                                label = { Text("Nueva contraseña") },
+                                label = { Text(stringResource(R.string.new_password)) },
                                 visualTransformation = PasswordVisualTransformation(),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -262,7 +264,7 @@ fun EditProfileScreen(
                         isPrivate = isPrivate,
                         onSuccess = {
                             isSaving = false
-                            Toast.makeText(context, "Perfil actualizado", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.profile_updated), Toast.LENGTH_SHORT).show()
                             navController.popBackStack()
                         },
                         onError = {
@@ -279,7 +281,7 @@ fun EditProfileScreen(
                 if (isSaving) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
                 } else {
-                    Text("Guardar Cambios", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.save_changes), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
