@@ -1,6 +1,7 @@
 package com.example.pm.ui.screens
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -35,6 +36,9 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
+    
+    val emailError by viewModel.emailError.collectAsState()
+    val passwordError by viewModel.passwordError.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loginEvent.collectLatest { event ->
@@ -45,7 +49,7 @@ fun LoginScreen(
                     }
                 }
                 is LoginViewModel.LoginEvent.Error -> {
-                    Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(event.messageRes), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -56,37 +60,74 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo corregido: Sin recorte circular para que no se corte la copa
         Image(
             painter = painterResource(id = R.drawable.logo),
             contentDescription = "App Logo",
             modifier = Modifier
-                .size(220.dp) // Un poco más grande ahora que no se corta
+                .size(200.dp)
                 .padding(8.dp),
             contentScale = ContentScale.Fit
         )
         
         Spacer(modifier = Modifier.height(16.dp))
         Text(stringResource(R.string.app_name), fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = NeonPurple)
-        Text(stringResource(R.string.slogan), color = Color.Gray, modifier = Modifier.padding(bottom = 48.dp))
+        Text(stringResource(R.string.slogan), color = Color.Gray, modifier = Modifier.padding(bottom = 32.dp))
 
         OutlinedTextField(
-            value = email, onValueChange = { email = it },
+            value = email, 
+            onValueChange = { email = it },
             label = { Text(stringResource(R.string.email)) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray, focusedLabelColor = NeonPurple, cursorColor = NeonPurple)
+            isError = emailError != null,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = NeonPurple, 
+                unfocusedBorderColor = Color.DarkGray, 
+                focusedLabelColor = NeonPurple, 
+                cursorColor = NeonPurple,
+                errorBorderColor = Color.Red,
+                errorLabelColor = Color.Red
+            )
         )
+        AnimatedVisibility(visible = emailError != null) {
+            Text(
+                text = emailError?.let { stringResource(it) } ?: "",
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
+        
         OutlinedTextField(
-            value = password, onValueChange = { password = it },
+            value = password, 
+            onValueChange = { password = it },
             label = { Text(stringResource(R.string.password)) },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray, focusedLabelColor = NeonPurple, cursorColor = NeonPurple)
+            isError = passwordError != null,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = NeonPurple, 
+                unfocusedBorderColor = Color.DarkGray, 
+                focusedLabelColor = NeonPurple, 
+                cursorColor = NeonPurple,
+                errorBorderColor = Color.Red,
+                errorLabelColor = Color.Red
+            )
         )
+        AnimatedVisibility(visible = passwordError != null) {
+            Text(
+                text = passwordError?.let { stringResource(it) } ?: "",
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
+        
         Button(
             onClick = { viewModel.login(email, password) },
             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -95,6 +136,7 @@ fun LoginScreen(
         ) {
             Text(stringResource(R.string.login), color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 18.sp)
         }
+
         TextButton(onClick = { navController.navigate("register") }) {
             Text(stringResource(R.string.no_account), color = NeonPink)
         }

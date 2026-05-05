@@ -1,6 +1,7 @@
 package com.example.pm.ui.screens
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +39,10 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
 
+    val usernameError by viewModel.usernameError.collectAsState()
+    val emailError by viewModel.emailError.collectAsState()
+    val passwordError by viewModel.passwordError.collectAsState()
+
     LaunchedEffect(Unit) {
         viewModel.registerEvent.collectLatest { event ->
             when (event) {
@@ -47,7 +52,7 @@ fun RegisterScreen(
                     }
                 }
                 is RegisterViewModel.RegisterEvent.Error -> {
-                    Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(event.messageRes), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -66,31 +71,77 @@ fun RegisterScreen(
         Spacer(modifier = Modifier.height(16.dp))
         Text(stringResource(R.string.register_title), fontSize = 32.sp, fontWeight = FontWeight.Bold, color = NeonPurple)
         Spacer(modifier = Modifier.height(32.dp))
+
         OutlinedTextField(
             value = username, onValueChange = { username = it },
             label = { Text(stringResource(R.string.username)) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray)
+            isError = usernameError != null,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = NeonPurple, 
+                unfocusedBorderColor = Color.DarkGray,
+                errorBorderColor = Color.Red
+            )
         )
+        AnimatedVisibility(visible = usernameError != null) {
+            Text(
+                text = usernameError?.let { stringResource(it) } ?: "",
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
+
         OutlinedTextField(
             value = email, onValueChange = { email = it },
             label = { Text(stringResource(R.string.email)) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray)
+            isError = emailError != null,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = NeonPurple, 
+                unfocusedBorderColor = Color.DarkGray,
+                errorBorderColor = Color.Red
+            )
         )
+        AnimatedVisibility(visible = emailError != null) {
+            Text(
+                text = emailError?.let { stringResource(it) } ?: "",
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
+
         OutlinedTextField(
             value = password, onValueChange = { password = it },
             label = { Text(stringResource(R.string.password)) },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonPurple, unfocusedBorderColor = Color.DarkGray)
+            isError = passwordError != null,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = NeonPurple, 
+                unfocusedBorderColor = Color.DarkGray,
+                errorBorderColor = Color.Red
+            )
         )
+        AnimatedVisibility(visible = passwordError != null) {
+            Text(
+                text = passwordError?.let { stringResource(it) } ?: "",
+                color = Color.Red,
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
+
         Button(
             onClick = { viewModel.register(username, email, password) },
             modifier = Modifier.fillMaxWidth().height(50.dp),

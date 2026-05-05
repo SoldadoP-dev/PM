@@ -149,4 +149,16 @@
     <string name="no_results">No se han encontrado resultados</string>
     <string name="you">Tú</string>
     <string name="profile_updated">Perfil actualizado</string>
+
+    <!-- Errores de Autenticación -->
+    <string name="error_empty_fields">Completa todos los campos</string>
+    <string name="error_invalid_email">Formato de email no válido</string>
+    <string name="error_wrong_password">Contraseña incorrecta</string>
+    <string name="error_user_not_found">No hay ninguna cuenta con este email</string>
+    <string name="error_email_already_in_use">Este email ya está registrado</string>
+    <string name="error_weak_password">La contraseña es demasiado débil</string>
+    <string name="error_password_too_short">Mínimo 6 caracteres</string>
+    <string name="error_password_no_upper">Incluye al menos una mayúscula</string>
+    <string name="error_unknown">Ha ocurrido un error inesperado</string>
+    <string name="error_invalid_credentials">Credenciales incorrectas</string>
 </resources>
