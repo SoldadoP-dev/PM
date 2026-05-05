@@ -141,6 +141,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
     }
 
+    //Panel de notis
     private fun startNotificationMonitor(uid: String) {
         if (notificationListener != null) return
 
