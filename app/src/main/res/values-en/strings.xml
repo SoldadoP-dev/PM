@@ -149,4 +149,16 @@
     <string name="no_results">No results found</string>
     <string name="you">You</string>
     <string name="profile_updated">Profile updated</string>
+
+    <!-- Authentication Errors -->
+    <string name="error_empty_fields">Please fill all fields</string>
+    <string name="error_invalid_email">Invalid email format</string>
+    <string name="error_wrong_password">Incorrect password</string>
+    <string name="error_user_not_found">No account found with this email</string>
+    <string name="error_email_already_in_use">This email is already registered</string>
+    <string name="error_weak_password">Password is too weak</string>
+    <string name="error_password_too_short">Minimum 6 characters</string>
+    <string name="error_password_no_upper">Include at least one uppercase letter</string>
+    <string name="error_unknown">An unexpected error occurred</string>
+    <string name="error_invalid_credentials">Invalid credentials</string>
 </resources>
