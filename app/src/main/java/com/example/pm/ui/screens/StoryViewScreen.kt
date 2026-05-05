@@ -34,6 +34,8 @@ import com.example.pm.ui.components.UserAvatar
 import com.example.pm.ui.components.VideoPlayer
 import com.example.pm.ui.theme.NeonPurple
 import com.example.pm.ui.viewmodels.StoryViewModel
+import com.example.pm.utils.TimeUtils
+import com.google.firebase.Timestamp
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 
@@ -285,6 +287,16 @@ fun UserStoryContent(
                 fontSize = 16.sp,
                 modifier = Modifier.clickable { onUserClick(currentStory.userId) }
             )
+            
+            // Calculamos el tiempo de subida (expiresAt - 24h)
+            val creationTimestamp = Timestamp(currentStory.expiresAt.seconds - 86400, 0)
+            Text(
+                text = TimeUtils.formatTimestampShort(creationTimestamp),
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 14.sp,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+
             Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = onClose) {
                 Icon(Icons.Default.Close, null, tint = Color.White)

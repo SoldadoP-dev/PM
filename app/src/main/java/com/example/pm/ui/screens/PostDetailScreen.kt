@@ -38,6 +38,7 @@ import com.example.pm.ui.components.UserAvatar
 import com.example.pm.ui.components.VideoPlayer
 import com.example.pm.ui.theme.NeonPink
 import com.example.pm.ui.viewmodels.PostDetailViewModel
+import com.example.pm.utils.TimeUtils
 
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -249,7 +250,12 @@ fun PostDetailContent(
                                     color = Color.White,
                                     fontSize = 14.sp
                                 )
-                                Text("Hace poco", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                                Text(
+                                    text = TimeUtils.formatTimestamp(p.timestamp),
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
                             }
                             HorizontalDivider(color = Color(0xFF262626), modifier = Modifier.padding(top = 16.dp))
                         }
@@ -339,7 +345,9 @@ fun CommentItemDetail(comment: Comment, viewModel: PostDetailViewModel) {
             Text(
                 text = buildAnnotatedString {
                     withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("${comment.username} ") }
-                    withStyle(SpanStyle(color = Color.Gray, fontSize = 12.sp)) { append("7 h") }
+                    withStyle(SpanStyle(color = Color.Gray, fontSize = 12.sp)) { 
+                        append(TimeUtils.formatTimestampShort(comment.timestamp)) 
+                    }
                 },
                 color = Color.White,
                 fontSize = 14.sp
