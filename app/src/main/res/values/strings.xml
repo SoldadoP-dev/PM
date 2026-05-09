@@ -148,6 +148,9 @@
     <string name="all_filter">Todos</string>
     <string name="no_results">No se han encontrado resultados</string>
     <string name="you">Tú</string>
+    <string name="unfollow_confirm_title">¿Dejar de seguir?</string>
+    <string name="unfollow_confirm_message">¿Estás seguro de que quieres dejar de seguir a %1$s? Tendrás que volver a solicitarlo y ya no verás sus publicaciones ni historias si su cuenta es privada.</string>
+    <string name="unfollow">Dejar de seguir</string>
     <string name="profile_updated">Perfil actualizado</string>
 
     <!-- Errores de Autenticación -->

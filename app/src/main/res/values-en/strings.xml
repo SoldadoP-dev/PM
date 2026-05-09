@@ -148,6 +148,9 @@
     <string name="all_filter">All</string>
     <string name="no_results">No results found</string>
     <string name="you">You</string>
+    <string name="unfollow_confirm_title">Unfollow?</string>
+    <string name="unfollow_confirm_message">Are you sure you want to unfollow %1$s? You will have to request to follow again and you will no longer see their posts or stories if their account is private.</string>
+    <string name="unfollow">Unfollow</string>
     <string name="profile_updated">Profile updated</string>
 
     <!-- Authentication Errors -->

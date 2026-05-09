@@ -104,21 +104,49 @@ fun OtherProfileScreen(
 
                             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                                 val currentlyRequested = isPending || isOptimisticRequested
+                                var showUnfollowDialog by remember { mutableStateOf(false) }
+
+                                if (showUnfollowDialog) {
+                                    AlertDialog(
+                                        onDismissRequest = { showUnfollowDialog = false },
+                                        title = { Text(stringResource(R.string.unfollow_confirm_title)) },
+                                        text = { Text(stringResource(R.string.unfollow_confirm_message, user?.username ?: "")) },
+                                        confirmButton = {
+                                            TextButton(onClick = {
+                                                showUnfollowDialog = false
+                                                viewModel.toggleFollow(userId)
+                                            }) {
+                                                Text(stringResource(R.string.unfollow), color = Color.White)
+                                            }
+                                        },
+                                        dismissButton = {
+                                            TextButton(onClick = { showUnfollowDialog = false }) {
+                                                Text(stringResource(R.string.cancel), color = Color.Gray)
+                                            }
+                                        },
+                                        containerColor = Color(0xFF1A1A1A),
+                                        titleContentColor = Color.White,
+                                        textContentColor = Color.Gray
+                                    )
+                                }
                                 
                                 Button(
                                     onClick = { 
-                                        if (!isFollowing && !currentlyRequested) {
+                                        if (isFollowing) {
+                                            showUnfollowDialog = true
+                                        } else if (currentlyRequested) {
+                                            isOptimisticRequested = false
+                                            viewModel.toggleFollow(userId)
+                                        } else {
                                             isOptimisticRequested = true
                                             viewModel.toggleFollow(userId) 
                                         }
                                     },
-                                    enabled = !isFollowing && !currentlyRequested,
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isFollowing || currentlyRequested) Color.DarkGray else NeonPurple,
-                                        disabledContainerColor = Color.DarkGray,
-                                        disabledContentColor = Color.White
+                                        contentColor = Color.White
                                     )
                                 ) {
                                     Text(

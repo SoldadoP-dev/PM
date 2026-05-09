@@ -82,7 +82,9 @@ class OtherProfileViewModel @Inject constructor(
             if (isFollowing) {
                 firestore.collection("users").document(currentUserId).update("followingUids", FieldValue.arrayRemove(userId), "followingCount", FieldValue.increment(-1))
                 firestore.collection("users").document(userId).update("followerUids", FieldValue.arrayRemove(currentUserId), "followersCount", FieldValue.increment(-1))
-            } else if (!isPending) {
+            } else if (isPending) {
+                firestore.collection("users").document(userId).update("pendingFollowRequests", FieldValue.arrayRemove(currentUserId))
+            } else {
                 firestore.collection("users").document(userId).update("pendingFollowRequests", FieldValue.arrayUnion(currentUserId))
                 val notif = ActivityNotification(fromUserId = currentUserId, fromUsername = currentUser.username, toUserId = userId, type = "follow_request")
                 repository.sendNotification(notif)
