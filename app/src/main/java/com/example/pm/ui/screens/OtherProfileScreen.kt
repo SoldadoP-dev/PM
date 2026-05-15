@@ -34,6 +34,7 @@ import com.example.pm.Post
 import com.example.pm.R
 import com.example.pm.ui.components.ProfileStat
 import com.example.pm.ui.components.UserAvatar
+import com.example.pm.ui.theme.CardGray
 import com.example.pm.ui.theme.DeepSpace
 import com.example.pm.ui.theme.NeonPurple
 import com.example.pm.ui.viewmodels.OtherProfileViewModel
@@ -50,9 +51,17 @@ fun OtherProfileScreen(
     val posts by viewModel.posts.collectAsState()
     
     var isOptimisticRequested by rememberSaveable(userId) { mutableStateOf(false) }
+    var showFollowRequestDialog by rememberSaveable(userId) { mutableStateOf(false) }
 
     LaunchedEffect(userId) {
         viewModel.loadProfile(userId)
+    }
+
+    // Detectar si este usuario nos ha solicitado seguir para mostrar el pop-up
+    LaunchedEffect(currentUser?.pendingFollowRequests, user) {
+        if (currentUser?.pendingFollowRequests?.contains(userId) == true) {
+            showFollowRequestDialog = true
+        }
     }
 
     val isFollowing = currentUser?.followingUids?.contains(userId) == true
@@ -61,6 +70,49 @@ fun OtherProfileScreen(
     val canSeeContent = !isPrivate || isFollowing || userId == currentUser?.uid
 
     if (isPending) isOptimisticRequested = false
+
+    // Pop-up de solicitud de seguimiento recibida (Botón Ignorar implementado)
+    if (showFollowRequestDialog && user != null) {
+        AlertDialog(
+            onDismissRequest = { showFollowRequestDialog = false },
+            title = { 
+                Text(
+                    text = stringResource(R.string.follow_request), 
+                    color = Color.White, 
+                    fontSize = 20.sp, 
+                    fontWeight = FontWeight.Bold 
+                ) 
+            },
+            text = {
+                Text(
+                    text = "${user?.username} te ha enviado una solicitud de seguimiento. ¿Quieres aceptarla?",
+                    color = Color.LightGray,
+                    fontSize = 16.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.acceptFollowRequest(userId)
+                        showFollowRequestDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
+                ) {
+                    Text(stringResource(R.string.accept), color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    // Simplemente cerramos el aviso, manteniendo la solicitud para más tarde
+                    showFollowRequestDialog = false 
+                }) {
+                    Text(stringResource(R.string.ignore), color = Color.Gray)
+                }
+            },
+            containerColor = CardGray,
+            shape = RoundedCornerShape(28.dp)
+        )
+    }
 
     Scaffold(
         topBar = {

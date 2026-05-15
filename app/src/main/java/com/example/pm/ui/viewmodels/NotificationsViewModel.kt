@@ -34,6 +34,10 @@ class NotificationsViewModel @Inject constructor(
         list.filter { it.type != "follow_request" }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    // Cambiado a Eagerly para que el usuario esté siempre disponible y no de null al volver a la pantalla
+    val currentUser = repository.getCurrentUserFlow()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     init {
         loadNotifications()
     }
@@ -92,6 +96,16 @@ class NotificationsViewModel @Inject constructor(
         }
     }
 
+    fun declineFollowRequest(notif: ActivityNotification) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            firestore.collection("users").document(currentUserId).update(
+                "pendingFollowRequests", FieldValue.arrayRemove(notif.fromUserId)
+            )
+            markAsRead(notif.id)
+        }
+    }
+
     fun respondToMeetup(notif: ActivityNotification, accept: Boolean) {
         viewModelScope.launch {
             val meetup = repository.getMeetupByChatId(notif.targetId)
@@ -110,7 +124,6 @@ class NotificationsViewModel @Inject constructor(
                 for (id in notificationIds) {
                     batch.delete(firestore.collection("notifications").document(id))
                     count++
-                    // batch max is 500
                     if (count == 500) {
                         batch.commit().await()
                         count = 0

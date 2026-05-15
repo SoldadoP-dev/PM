@@ -56,7 +56,6 @@ class VenueDetailViewModel @Inject constructor(
 
     private val _currentVenueId = MutableStateFlow<String?>(null)
 
-    // New states for invitation system
     private val _followers = MutableStateFlow<List<User>>(emptyList())
     val followers: StateFlow<List<User>> = _followers
 
@@ -66,6 +65,7 @@ class VenueDetailViewModel @Inject constructor(
     private val _venueAttendeeUids = MutableStateFlow<Set<String>>(emptySet())
     val venueAttendeeUids: StateFlow<Set<String>> = _venueAttendeeUids
 
+    // Restauramos el flujo de asistencia del usuario actual
     val currentUserAttendance: StateFlow<Attendance?> = repository.getUserAttendanceFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -86,15 +86,19 @@ class VenueDetailViewModel @Inject constructor(
     private fun observeUserAttendance() {
         viewModelScope.launch {
             repository.getUserAttendanceFlow().collectLatest { attendance ->
-                if (attendance != null) {
-                    val venueId = _currentVenueId.value
-                    _hasOtherAttendance.value = venueId != null && attendance.venueId != venueId
-                    _otherVenueAttendance.value = repository.getVenueById(attendance.venueId)
-                } else {
-                    _hasOtherAttendance.value = false
-                    _otherVenueAttendance.value = null
-                }
+                updateConflictState(attendance)
             }
+        }
+    }
+
+    private suspend fun updateConflictState(attendance: Attendance?) {
+        val currentVenueId = _currentVenueId.value
+        if (attendance != null && currentVenueId != null && attendance.venueId != currentVenueId) {
+            _hasOtherAttendance.value = true
+            _otherVenueAttendance.value = repository.getVenueById(attendance.venueId)
+        } else {
+            _hasOtherAttendance.value = false
+            _otherVenueAttendance.value = null
         }
     }
 
@@ -115,6 +119,9 @@ class VenueDetailViewModel @Inject constructor(
     fun loadVenueDetails(venueId: String) {
         _currentVenueId.value = venueId
         viewModelScope.launch {
+            val currentAttendance = repository.getUserAttendance()
+            updateConflictState(currentAttendance)
+            
             repository.getVenueAttendances(venueId).collect { attendances ->
                 _attendancesCount.value = attendances.size
                 _isAttending.value = attendances.any { it.userId == currentUserId }
@@ -173,18 +180,6 @@ class VenueDetailViewModel @Inject constructor(
     fun sendInvitations(venueId: String, venueName: String, selectedUserIds: List<String>, selectedChatIds: List<String>) {
         viewModelScope.launch {
             repository.sendVenueInvitation(venueId, venueName, selectedUserIds, selectedChatIds)
-        }
-    }
-
-    fun checkAttendanceConflict(targetVenueId: String, onResult: (Venue?) -> Unit) {
-        viewModelScope.launch {
-            val current = repository.getUserAttendance()
-            if (current != null && current.venueId != targetVenueId) {
-                val otherVenue = repository.getVenueById(current.venueId)
-                onResult(otherVenue)
-            } else {
-                onResult(null)
-            }
         }
     }
 }

@@ -13,6 +13,7 @@ import com.google.firebase.firestore.SetOptions
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 @HiltViewModel
@@ -89,6 +90,54 @@ class OtherProfileViewModel @Inject constructor(
                 val notif = ActivityNotification(fromUserId = currentUserId, fromUsername = currentUser.username, toUserId = userId, type = "follow_request")
                 repository.sendNotification(notif)
             }
+        }
+    }
+
+    fun acceptFollowRequest(targetUserId: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            firestore.collection("users").document(currentUserId).update(
+                "followerUids", FieldValue.arrayUnion(targetUserId),
+                "followersCount", FieldValue.increment(1),
+                "pendingFollowRequests", FieldValue.arrayRemove(targetUserId)
+            )
+            firestore.collection("users").document(targetUserId).update(
+                "followingUids", FieldValue.arrayUnion(currentUserId),
+                "followingCount", FieldValue.increment(1)
+            )
+            
+            // Eliminar notificación de follow_request si existe
+            try {
+                val notifs = firestore.collection("notifications")
+                    .whereEqualTo("toUserId", currentUserId)
+                    .whereEqualTo("fromUserId", targetUserId)
+                    .whereEqualTo("type", "follow_request")
+                    .get().await()
+                for (doc in notifs.documents) {
+                    doc.reference.delete()
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
+    fun declineFollowRequest(targetUserId: String) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        viewModelScope.launch {
+            firestore.collection("users").document(currentUserId).update(
+                "pendingFollowRequests", FieldValue.arrayRemove(targetUserId)
+            )
+            
+            // Eliminar notificación de follow_request si existe
+            try {
+                val notifs = firestore.collection("notifications")
+                    .whereEqualTo("toUserId", currentUserId)
+                    .whereEqualTo("fromUserId", targetUserId)
+                    .whereEqualTo("type", "follow_request")
+                    .get().await()
+                for (doc in notifs.documents) {
+                    doc.reference.delete()
+                }
+            } catch (e: Exception) {}
         }
     }
 

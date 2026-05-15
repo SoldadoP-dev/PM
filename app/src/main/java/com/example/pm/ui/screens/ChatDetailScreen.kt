@@ -1,5 +1,6 @@
 package com.example.pm.ui.screens
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -16,11 +17,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AddCircleOutline
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +37,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
+import com.example.pm.Attendance
 import com.example.pm.Message
 import com.example.pm.R
 import com.example.pm.ui.components.UserAvatar
@@ -68,11 +66,15 @@ fun ChatDetailScreen(
     val listState = rememberLazyListState()
     val context = LocalContext.current
 
-    // Invitation handling
+    // Gestión de invitaciones y conflictos de asistencia
     var showTagDialogForInvite by remember { mutableStateOf<String?>(null) }
     var showConflictDialogForInvite by remember { mutableStateOf<String?>(null) }
     val availableTags by venueViewModel.availableTags.collectAsState()
-    val userAttendance by venueViewModel.currentUserAttendance.collectAsState()
+    
+    // Recogida de estado explícita para evitar errores de inferencia
+    val userAttendanceState = venueViewModel.currentUserAttendance.collectAsState()
+    val userAttendance = userAttendanceState.value
+    
     val otherVenueAttendance by venueViewModel.otherVenueAttendance.collectAsState()
 
     LaunchedEffect(chatId) {
@@ -104,14 +106,16 @@ fun ChatDetailScreen(
         }
     }
 
+    // Diálogo de conflicto
     if (showConflictDialogForInvite != null) {
+        val targetId = showConflictDialogForInvite!!
         AlertDialog(
             onDismissRequest = { showConflictDialogForInvite = null },
             title = { Text(text = stringResource(R.string.change_plans_title), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
             text = {
-                val otherNameText = otherVenueAttendance?.name ?: stringResource(R.string.group_default_name)
+                val currentVenueName = otherVenueAttendance?.name ?: stringResource(R.string.group_default_name)
                 Text(
-                    text = stringResource(R.string.change_plans_message, otherNameText, "esta quedada"),
+                    text = stringResource(R.string.change_plans_message, currentVenueName, "este plan"),
                     color = Color.LightGray,
                     fontSize = 16.sp
                 )
@@ -120,9 +124,8 @@ fun ChatDetailScreen(
                 Button(
                     onClick = {
                         venueViewModel.clearCurrentAttendance()
-                        val venueId = showConflictDialogForInvite!!
                         showConflictDialogForInvite = null
-                        showTagDialogForInvite = venueId
+                        showTagDialogForInvite = targetId
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonPurple)
                 ) {
@@ -139,12 +142,14 @@ fun ChatDetailScreen(
         )
     }
 
+    // Diálogo de etiquetas
     if (showTagDialogForInvite != null) {
+        val targetId = showTagDialogForInvite!!
         TagSelectionDialog(
             availableTags = availableTags.map { it.name },
             onDismiss = { showTagDialogForInvite = null },
             onConfirm = { tags ->
-                venueViewModel.toggleAttendance(showTagDialogForInvite!!, tags)
+                venueViewModel.toggleAttendance(targetId, tags)
                 showTagDialogForInvite = null
             }
         )
@@ -245,11 +250,11 @@ fun ChatDetailScreen(
                     msg = msg, 
                     isMe = isMe, 
                     isAlreadyAttending = isAlreadyAttending,
-                    onJoinInvite = { venueId ->
-                        if (userAttendance != null && userAttendance?.venueId != venueId) {
-                            showConflictDialogForInvite = venueId
+                    onJoinInvite = { requestedVenueId ->
+                        if (userAttendance != null && userAttendance.venueId != requestedVenueId) {
+                            showConflictDialogForInvite = requestedVenueId
                         } else {
-                            showTagDialogForInvite = venueId
+                            showTagDialogForInvite = requestedVenueId
                         }
                     }
                 )
@@ -305,6 +310,7 @@ fun ChatBubble(
         }
 
         if (isVenueInvite) {
+            val inviteId = msg.venueInviteId!! // Seguro por isVenueInvite
             Surface(
                 color = if (isMe) NeonPurple else CardGray,
                 shape = RoundedCornerShape(20.dp)
@@ -314,7 +320,7 @@ fun ChatBubble(
                         Icon(Icons.Default.LocationOn, null, tint = if (isMe) Color.Black else NeonPurple, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = msg.venueInviteName ?: "Quedada",
+                            text = msg.venueInviteName ?: stringResource(R.string.group_default_name),
                             color = if (isMe) Color.Black else Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
@@ -328,7 +334,9 @@ fun ChatBubble(
                     )
                     
                     Button(
-                        onClick = { if (!isAlreadyAttending) msg.venueInviteId?.let { onJoinInvite(it) } },
+                        onClick = { 
+                            onJoinInvite(inviteId) 
+                        },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isAlreadyAttending) Color.DarkGray else NeonPurple,
                             disabledContainerColor = Color.DarkGray
@@ -336,7 +344,7 @@ fun ChatBubble(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.padding(top = 8.dp).height(36.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                        enabled = !isAlreadyAttending || isMe
+                        enabled = !isAlreadyAttending
                     ) {
                         if (isAlreadyAttending) {
                             Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = NeonPurple, modifier = Modifier.size(16.dp))

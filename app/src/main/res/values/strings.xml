@@ -48,6 +48,7 @@
     <string name="follow_request">quiere seguirte</string>
     <string name="accept">Aceptar</string>
     <string name="decline">Rechazar</string>
+    <string name="ignore">Ignorar</string>
     <string name="map">Mapa</string>
     <string name="explore">Explorar</string>
     <string name="chats">Chats</string>

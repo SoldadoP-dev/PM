@@ -210,15 +210,16 @@ fun AppNavigation(navController: NavHostController, auth: FirebaseAuth) {
         composable("login") { LoginScreen(navController) }
         composable("register") { RegisterScreen(navController) }
         
-        // Ruta única para main con parámetro opcional de pestaña
+        // Ruta modificada para que tab sea opcional y nullable
         composable(
             route = "main?tab={tab}",
             arguments = listOf(navArgument("tab") { 
                 type = NavType.StringType
-                defaultValue = "0" 
+                nullable = true
+                defaultValue = null
             })
         ) { backStackEntry ->
-            val tab = backStackEntry.arguments?.getString("tab")?.toIntOrNull() ?: 0
+            val tab = backStackEntry.arguments?.getString("tab")?.toIntOrNull()
             MainScreen(navController, initialTab = tab)
         }
 

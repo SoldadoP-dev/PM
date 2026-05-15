@@ -40,9 +40,10 @@ import kotlin.math.abs
 fun MainScreen(
     rootNavController: NavHostController,
     viewModel: MainViewModel = hiltViewModel(),
-    initialTab: Int = 0
+    initialTab: Int? = null
 ) {
-    val pagerState = rememberPagerState(initialPage = initialTab, pageCount = { 4 })
+    // Si initialTab es null, usamos 0 como valor inicial para el estado del pager
+    val pagerState = rememberPagerState(initialPage = initialTab ?: 0, pageCount = { 4 })
     val scope = rememberCoroutineScope()
     var selectedVenue by remember { mutableStateOf<Venue?>(null) }
     var showBottomSheet by remember { mutableStateOf(false) }
@@ -50,9 +51,9 @@ fun MainScreen(
     val unreadNotifications by viewModel.unreadNotificationsCount.collectAsState()
     val hasUnread = unreadNotifications > 0
 
-    // Sincronizar el pager si cambia la pestaña inicial (p. ej. al venir de una historia)
+    // Sincronizar el pager SOLO si se recibe una pestaña específica (no null)
     LaunchedEffect(initialTab) {
-        if (pagerState.currentPage != initialTab) {
+        if (initialTab != null && pagerState.currentPage != initialTab) {
             pagerState.scrollToPage(initialTab)
         }
     }

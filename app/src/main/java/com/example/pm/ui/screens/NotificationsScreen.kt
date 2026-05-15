@@ -45,6 +45,7 @@ fun NotificationsScreen(
 ) {
     val requests by viewModel.followRequests.collectAsState()
     val generalNotifs by viewModel.generalNotifications.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
     
     var selectedMeetupNotif by remember { mutableStateOf<ActivityNotification?>(null) }
     
@@ -120,8 +121,13 @@ fun NotificationsScreen(
                     SectionHeader(stringResource(R.string.follow_requests_title))
                 }
                 items(requests, key = { it.id }) { notif ->
+                    // Modificación clave: si currentUser es null (cargando), asumimos que es pendiente 
+                    // para evitar que los botones desaparezcan al volver de otra pantalla.
+                    val isPending = currentUser == null || currentUser?.pendingFollowRequests?.contains(notif.fromUserId) == true
+                    
                     NotificationItem(
                         notif = notif,
+                        isPendingRequest = isPending,
                         isSelectionMode = isSelectionMode,
                         isSelected = selectedNotifs.contains(notif.id),
                         onLongClick = { 
@@ -129,7 +135,7 @@ fun NotificationsScreen(
                             selectedNotifs.add(notif.id)
                         },
                         onAccept = { viewModel.acceptFollowRequest(notif) },
-                        onDecline = { /* Opcional: implementar rechazo */ },
+                        onDecline = { viewModel.declineFollowRequest(notif) },
                         onClick = {
                             if (isSelectionMode) {
                                 if (selectedNotifs.contains(notif.id)) selectedNotifs.remove(notif.id)
@@ -226,6 +232,7 @@ fun SectionHeader(title: String) {
 @Composable
 fun NotificationItem(
     notif: ActivityNotification,
+    isPendingRequest: Boolean = false,
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onLongClick: () -> Unit = {},
@@ -280,9 +287,9 @@ fun NotificationItem(
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (notif.type == "follow_request") {
-                    val currentlyProcessed = isProcessedLocal || notif.isRead
-                    
-                    if (!currentlyProcessed) {
+                    // Los botones se mantienen visibles hasta que se procese la solicitud localmente
+                    // o el servidor confirme que ya no está pendiente.
+                    if (isPendingRequest && !isProcessedLocal) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             IconButton(
                                 onClick = {
